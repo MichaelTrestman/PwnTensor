@@ -58,6 +58,55 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # Miner — serves game AI responses to validators via axon
+  miner:
+    build:
+      context: .
+      dockerfile: Dockerfile.miner
+
+    container_name: pwntensor-miner
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      - NETWORK=${NETWORK:-finney}
+      - NETUID=${NETUID:-1}
+      - WALLET_NAME=${MINER_WALLET_NAME:-miner}
+      - HOTKEY_NAME=${MINER_HOTKEY_NAME:-default}
+      - AXON_PORT=8091
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    volumes:
+      - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
+
+    ports:
+      - "${AXON_PORT:-8091}:8091"
+
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import bittensor; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
   # Frontend — nginx serving all three game UIs
   frontend:
     image: nginx:alpine

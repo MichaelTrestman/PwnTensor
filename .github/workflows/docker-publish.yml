@@ -1,11 +1,9 @@
 # PwnTensor Subnet - Docker Build and Push
 #
-# This workflow builds and pushes the Docker image to GHCR
-# whenever code is pushed to the main branch.
-#
-# Validators using Watchtower will automatically pull the new image.
+# Builds and pushes validator + miner images to GHCR.
+# Validators/miners using Watchtower will automatically pull new images.
 
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -14,12 +12,15 @@ on:
       - master
     paths:
       - 'validator.py'
+      - 'miner.py'
+      - 'miner_ai.py'
       - 'protocol.py'
       - 'reward.py'
       - 'game_registry.py'
       - 'frontend/**'
       - 'pyproject.toml'
       - 'Dockerfile'
+      - 'Dockerfile.miner'
       - 'deploy/**'
       - '.github/workflows/docker-publish.yml'
 
@@ -27,25 +28,17 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  build-validator:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -54,38 +47,72 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Docker
+      - name: Validator image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-validator
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
             type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push Docker image
+      - name: Build and push validator image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=validator
+          cache-to: type=gha,mode=max,scope=validator
+          platforms: linux/amd64,linux/arm64
+
+  build-miner:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Miner image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-miner
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+            type=ref,event=branch
+
+      - name: Build and push miner image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.miner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=miner
+          cache-to: type=gha,mode=max,scope=miner
           platforms: linux/amd64,linux/arm64
 
       - name: Generate build summary
         run: |
-          echo "## Docker Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "## Docker Images Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Validator:** \`${{ env.REGISTRY }}/${{ github.repository }}-validator\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Miner:** \`${{ env.REGISTRY }}/${{ github.repository }}-miner\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Validators running with Watchtower will automatically update within 5 minutes." >> $GITHUB_STEP_SUMMARY
+          echo "Watchtower will auto-update within 5 minutes." >> $GITHUB_STEP_SUMMARY

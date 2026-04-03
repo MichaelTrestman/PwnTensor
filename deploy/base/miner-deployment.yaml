@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwntensor-miner
+  namespace: pwntensor
+  labels:
+    app: pwntensor
+    component: miner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pwntensor
+      component: miner
+  template:
+    metadata:
+      labels:
+        app: pwntensor
+        component: miner
+    spec:
+      containers:
+        - name: miner
+          image: pwntensor-miner:latest
+          ports:
+            - containerPort: 8091
+              name: axon
+          envFrom:
+            - configMapRef:
+                name: pwntensor-config
+          env:
+            - name: WALLET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pwntensor-miner-wallet
+                  key: wallet-name
+            - name: HOTKEY_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pwntensor-miner-wallet
+                  key: hotkey-name
+            - name: AXON_PORT
+              value: "8091"
+          volumeMounts:
+            - name: wallet
+              mountPath: /root/.bittensor/wallets
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import bittensor; print('ok')"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+
+      volumes:
+        - name: wallet
+          secret:
+            secretName: pwntensor-miner-wallet-files
+            optional: true

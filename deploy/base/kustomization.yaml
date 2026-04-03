@@ -9,3 +9,5 @@ resources:
   - nginx-configmap.yaml
   - validator-deployment.yaml
   - service.yaml
+  - miner-deployment.yaml
+  - miner-service.yaml
