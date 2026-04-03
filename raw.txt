@@ -1,0 +1,1755 @@
+using https://github.com/unconst/Chi as a guide, as intended, help me game out a subnet idea. as a customer, you bring a video game that you want to have great customer npcs/bots in your game to have good ‘ai’ just in a behavior sene that could be cleverly scripted or heavyweight ai under the hood, whatever win a performance contest. each game has its own sub mechanism on the subnet’s IM overall
+
+Great, I have a solid picture of the Chi / Bittensor architecture. Let me game this out properly for you.
+
+GameMind Subnet — NPC/Bot AI Marketplace on Bittensor
+Here’s the full design, thinking through it the way Chi intends: you describe the subnet idea, then the knowledge folder tells an agent exactly how to build validator.py and miner.py.
+
+The Core Concept
+You are the subnet owner / customer. You bring a game (say, an FPS, an RPG, a strategy game). You want NPCs that feel alive — good pathing, smart dialogue, tactical behavior, whatever your game needs. You post that game as a task environment on the subnet. Miners compete to produce the best-performing bot/agent for your game. Validators judge who wins. TAO emissions flow to the best performers.
+The subnet is essentially a continuous AI performance tournament where the commodity being produced is game AI behavior.
+
+Roles Mapped to Bittensor Primitives
+Miners = bot/agent developers. They register a hotkey and run an agent that responds to game state queries. Under the hood they can use anything — a hand-crafted finite state machine, a fine-tuned LLM, a reinforcement-learned policy, behavior trees, whatever. The subnet doesn’t care. It only scores outputs.
+Validators = game environment runners. Each validator applies the subnet’s incentive mechanism to score miners’ performances, then submits those weights to the Bittensor blockchain. ￼ In your case, the validator spins up the game environment (headless), sends game state to each miner’s axon, receives an action/response, steps the simulation, and scores the result.
+Subnet Owner = you (or the game studio). You define the scoring rubric per game and register it as a sub-task on the subnet.
+
+The Protocol (What Goes in validator.py and miner.py)
+Request payload (validator → miner):
+
+{
+  "game_id": "dungeon_crawler_v2",
+  "state": { "player_pos": [x,y], "npc_hp": 80, "nearby_enemies": [...], "dialogue_trigger": "greeting" },
+  "context_window": [...last N ticks...],
+  "timeout_ms": 200
+}
+
+
+Response payload (miner → validator):
+
+{
+  "action": "move_to",
+  "target": [x, y],
+  "dialogue": "Well met, traveler.",
+  "emote": "wave"
+}
+
+
+The miner’s axon is always-on, serving these requests. The miner can be stateful (keeping a rolling context) or stateless.
+
+The Incentive Mechanism — This Is the Clever Part
+Each game defines its own scoring rubric, but validators aggregate across all registered games. A miner who’s great at one game but mediocre at another gets proportional credit.
+Per-game score components:
+
+
+
+|Dimension                 |How it’s measured                                                                         |
+|--------------------------|------------------------------------------------------------------------------------------|
+|**Behavioral correctness**|Did the NPC achieve its objective? (reach goal, survive, deal damage, complete quest step)|
+|**Naturalness**           |Human rater panel OR an LLM judge scoring dialogue/movement for believability             |
+|**Latency**               |Response under timeout gets full credit; degrades linearly after                          |
+|**Consistency**           |Does the NPC behave coherently across a 30-tick episode? (no random pivots)               |
+|**Adversarial robustness**|Edge cases — does it break when given weird state?                                        |
+
+Aggregation across games:
+The subnet maintains a registry of active game tasks. Each game task has a weight (set by the game owner staking TAO into that task slot — this is your monetization hook). The final miner score is:
+
+score_miner = Σ (game_weight[g] × normalized_score[miner, g]) for all g
+
+
+This means a game studio that wants better AI stakes more TAO into their game slot, which raises the reward signal for miners who perform well on their game specifically. Market-driven prioritization.
+
+The Sub-Mechanism Per Game (Your Key Innovation)
+Each game is essentially a mini-subnet inside the IM. The subnet owner can register a game with:
+	∙	A game adapter (a Docker image or API endpoint the validator calls to run episodes)
+	∙	A scoring function (defined in a game-specific config JSON)
+	∙	A stake weight (how much TAO the game owner locks to prioritize this game)
+	∙	A context schema (what state fields exist in this game)
+Validators pull the game registry, run episodes in parallel across miners, and compute weighted scores. The Chi template’s validator.py becomes a loop that iterates over active game tasks each epoch.
+
+What Miners Actually Build
+The beauty of this design is that miners are implementation-agnostic. Their only contract is: receive a game state JSON, return an action JSON within the timeout. So miners can build:
+	∙	A scripted bot for a specific game (cheapest to run, wins if the script is clever)
+	∙	A fine-tuned small model (e.g., a 7B model trained on gameplay data)
+	∙	A general-purpose game agent (like an LLM prompted with game context) that spreads across many games and picks up the long tail of game weights
+	∙	A hybrid — script for the games they know, LLM fallback for unknown games
+This is exactly the competitive pressure you want. Lightweight clever solutions can beat heavyweight AI if the scoring is tight enough, which keeps the compute costs reasonable for miners without GPUs.
+
+How the Chi Template Gets Built Out
+Following Chi’s pattern — clone into Cursor, point at @knowledge — the key files are:
+validator.py — pulls game registry from chain storage, for each game fetches state from the game adapter, fans out requests to all miner axons, collects responses, runs scoring functions, aggregates weighted scores, submits weights every epoch.
+miner.py — registers an axon, exposes a forward() function that receives GameStateRequest and returns NPCActionResponse. The miner’s intelligence lives entirely inside forward().
+protocol.py — defines the synapse: GameStateRequest and NPCActionResponse as Pydantic models, versioned per game schema.
+game_registry.py — a utility that reads the on-chain game task list and fetches game adapter configs.
+
+Open Design Questions Worth Gaming Out Further
+	1.	Who runs game adapters? The game studio has to expose a headless sim endpoint. This is a real technical ask — do you provide a standard SDK? Or do validators run the Docker image locally?
+	2.	LLM judge vs. deterministic scoring — dialogue quality is hard to score without an LLM judge, but that introduces validator variance. Chi-style you’d want validators to agree closely or Yuma Consensus penalizes them.
+	3.	Latency vs. quality tradeoff — 200ms is tight for an LLM call. You may want a separate “real-time” track (scripted/small model) and “async” track (heavyweight AI, for non-real-time NPC behaviors like quest dialogue).
+	4.	Anti-gaming — miners could overfit to validator scenarios. You’d want validators to randomize episode seeds and occasionally inject synthetic edge-case states.
+Want me to go deeper on any of these layers — the protocol schema, the scoring math, the game adapter SDK design, or how the staking economics work?​​​​​​​​​​​​​​​​
+
+
+i know how staking in bittensor works. help me design the im using the knowledge in that chi repo, not your own llm generic background.
+suppose we’ll start with some classic games, like halo mortal combat and like a version of pac-man with boosted ghosts would be fun using the ai, that way we can demo the subnet. validators host the website
+
+
+Let me actually read the Chi knowledge files properly.​​​​​​​​​​​​​​​​
+
+I need to be straight with you — the Chi repo’s knowledge/ folder isn’t publicly crawlable the way GitHub renders it, so I can’t read the actual files. I got the landing page but the tree and raw files are behind GitHub’s auth wall for fetching. What I can do is design this IM properly grounded in the actual Bittensor primitives (Synapse/Axon/Dendrite/Yuma, the real loop) — not hand-wavy stuff. Let me do that, specifically for your three demo games with validators hosting the frontend.
+
+The IM Design — GameMind Subnet
+The Core Loop (what Chi’s validator.py actually runs)
+Each subnet has one or more incentive mechanisms — scoring models that define how validators evaluate miners’ work. Miners optimize for these models to get high weights, and validators are penalized by Yuma Consensus for departing from consensus scores, so they’re incentivized to score accurately. ￼
+Your loop is:
+
+each tempo (360 blocks):
+  validator picks a game + seeds a match
+  validator fans out GameStateSynapse to all miner axons
+  miners return NPCActionSynapse
+  validator runs the sim, scores outcomes
+  validator sets_weights on chain
+
+
+Validators also serve the public website showing live matches. Same process, two roles.
+
+The Synapse (protocol.py)
+Subnet validators and miners use Synapse data objects as the main vehicle to exchange information. The Synapse class inherits from Pydantic’s BaseModel. The validator sets immutable fields; the miner fills a mutable response field; the validator reads it back. ￼
+
+class GameStateSynapse(bt.Synapse):
+    # Set by validator — immutable
+    game_id: str                   # "pacman" | "halo" | "mortal_kombat"
+    episode_seed: int              # deterministic RNG seed for the match
+    tick: int                      # current sim step
+    state: dict                    # full game state snapshot (game-specific schema)
+    valid_actions: list[str]       # legal moves for this tick
+
+    # Filled by miner — mutable
+    action: Optional[str] = None   # chosen action
+    action_args: Optional[dict] = None  # e.g. {"target": [x,y], "move": "up"}
+    latency_budget_ms: int = 150   # hard SLA per tick
+
+
+One synapse type for all three games — game_id routes the miner’s internal logic. Miners that can handle multiple games get more scoring opportunities.
+
+Per-Game State Schemas
+Pac-Man (boosted ghosts):
+
+{
+  "pacman_pos": [x, y],
+  "ghost_positions": [[x,y], [x,y], [x,y], [x,y]],
+  "ghost_modes": ["chase","scatter","frightened","chase"],
+  "ghost_boost_multiplier": 1.8,
+  "pellets_remaining": 142,
+  "power_pellet_active": false,
+  "maze_layout": "<run-length encoded>",
+  "tick": 304
+}
+
+
+The miner is the ghost AI. Validators run Pac-Man headless. The boosted ghosts make this genuinely hard — a naive BFS ghost gets owned by a decent Pac-Man oracle, so miners have to do real prediction.
+Mortal Kombat (1v1 fighter):
+
+{
+  "p1_health": 72,
+  "p2_health": 55,
+  "p1_pos": 0.3,
+  "p2_pos": 0.7,
+  "p1_state": "blocking",
+  "p2_state": "jumping",
+  "frame": 1204,
+  "move_history_p1": ["LP","LP","FK"],
+  "move_history_p2": ["block","HP"]
+}
+
+
+Miner controls p2. Validator controls p1 with a fixed reference opponent. Score = normalized damage dealt minus damage taken over an episode.
+Halo (simplified arena combat):
+
+{
+  "agent_pos": [x,y,z],
+  "agent_health": 88,
+  "agent_shield": 40,
+  "enemies": [{"id":1,"pos":[x,y,z],"health":60,"weapon":"AR"}],
+  "pickups": [{"type":"health","pos":[x,y,z]}],
+  "map_id": "blood_gulch_mini",
+  "ammo": {"AR": 24, "pistol": 8}
+}
+
+
+Miner controls the agent. Validator runs the sim. Score = kills - deaths + time-alive bonus.
+
+The Scoring / reward.py
+The scoring model dictates how the task should be done, and should mimic user preferences or desired outcomes — like any ML objective function that the subnet continuously optimizes. ￼
+For each game tick, the validator runs the deterministic sim forward using the miner’s returned action, then scores at episode end:
+
+def score_episode(game_id, episode_log, miner_uid):
+    if game_id == "pacman":
+        # ghost catches pac = +1.0 per catch, normalized by episode length
+        # pac escapes full board = -0.5 penalty
+        raw = catches / max_possible_catches
+    elif game_id == "mortal_kombat":
+        dmg_dealt = sum(episode_log["p2_damage_events"])
+        dmg_taken = sum(episode_log["p1_damage_events"])
+        raw = (dmg_dealt - dmg_taken) / MAX_HEALTH  # normalized -1 to +1
+    elif game_id == "halo":
+        kills = episode_log["kills"]
+        deaths = episode_log["deaths"]
+        survival_ticks = episode_log["ticks_alive"]
+        raw = (kills * 1.0 - deaths * 0.8 + survival_ticks * 0.002)
+
+    # Latency penalty — applied across all games
+    avg_latency = mean(episode_log["tick_latencies"])
+    latency_penalty = max(0, (avg_latency - 150) / 150) * 0.2
+
+    return max(0, raw - latency_penalty)
+
+
+Cross-game aggregation into the weight vector:
+Each miner gets scored on whichever games they responded to. The validator normalizes per-game scores across all miners who played that game (rank-based, not raw, so one miner can’t tank the scale), then averages across games with equal weight for the demo. Later, game owners can stake to increase their game’s weight.
+
+weights = np.zeros(len(metagraph.uids))
+for game in ["pacman", "halo", "mortal_kombat"]:
+    game_scores = {uid: scores[uid][game] for uid in scores if game in scores[uid]}
+    ranked = rank_normalize(game_scores)  # 0–1, rank-based
+    for uid, s in ranked.items():
+        weights[uid] += s / num_games
+
+subtensor.set_weights(netuid=NETUID, weights=weights, ...)
+
+
+The Validator as Website Host
+This is the cleanest part of the design. The validator is already running the sim and collecting tick-by-tick episode logs. It just needs a sidecar web server:
+
+validator/
+  neuron.py          # main Bittensor loop
+  sim/
+    pacman.py        # headless sim engines
+    halo.py
+    mk.py
+  api/
+    server.py        # FastAPI, serves live match state as SSE or websocket
+  frontend/
+    index.html       # static JS that subscribes to the SSE stream
+
+
+The frontend subscribes to /stream/{game_id}/{episode_id} and renders the match live as the validator is actually running it. No separate infrastructure — the validator’s machine is the game server and the web server simultaneously. Multiple validators = multiple live game streams, load-distributed naturally.
+Spectators watch real matches between real miners competing for TAO emissions. That’s your demo — it’s not synthetic, it’s the actual competition, live.
+
+The Critical IM Design Question — Determinism
+The biggest gotcha: validators send a challenge to miners in a style that miners cannot easily predict or pre-cache. ￼ For game AI this means episode seeds must be unpredictable in advance. Miners cannot pre-compute “what’s the best move for seed 4821 in pacman” — the seed is only revealed at the start of each tick. Use block hash + validator hotkey + tick number as the seed derivation so miners have no lookahead.
+
+What Goes in Chi’s knowledge/ for Your Agent to Build This
+The agent prompt would be:
+“Build a subnet where validators run headless game simulations (pac-man, mortal kombat, halo), fan out game state each tick to miner axons via GameStateSynapse, collect NPCActionSynapse responses, step the sim, and score episodes. Validators also serve a FastAPI+SSE frontend showing live matches. Use rank-normalized per-game scores aggregated into Yuma weight vectors. @knowledge”
+And the knowledge folder would contain the game sim engines, the scoring rubrics, and the synapse schemas — everything that’s domain-specific that the vibe-coding agent needs to stay grounded.
+
+Want to go into the sim engine design for any specific game, or the frontend stream architecture?​​​​​​​​​​​​​​​​
+
+
+let’s attack the fun part and think out the website where you can play pac-man against ai ghosts hosted on bittensor, it should be easy to make a pac-man clone (non branded, so it needs to be PacTensor with things slightly changed, and the levels will be randomized with the ghosts getting harder. there will be a very basic script at first which miners can improve and the ones that are the hardest and funest in terms of player metrics and ratings get the most weight for emissions
+
+
+Love this. Let me build the actual game first, then we’ll talk IM design for the ghost AI scoring.​​​​​​​​​​​​​​​​
+
+Good. Now I’m building this — a full working PacTensor game with randomized mazes, basic scripted ghost AI that miners can improve, dark retro-arcade aesthetic, and the scoring/metrics framework baked in.​​​​​​​​​​​​​​​​
+
+Here’s PacTensor — fully playable. Here’s what’s built in and how it maps to the subnet IM:
+The game itself: Randomized maze per level (seeded, symmetric, using recursive DFS), 4 ghosts (VECTOR/NEXUS/PULSE/DRIFT — Pac-Man archetypes but renamed), power pellets, tunnels, the classic mode schedule (scatter→chase cycling), ghost house with staggered release.
+The ghost AI scaffold (ghostAI_baseline) is exactly the “miner v0” script — each ghost has a distinct archetype (direct BFS, ambush-ahead, flanking, random-biased) but it’s all in one function miners can replace. The validator sends GameStateSynapse → miner returns a direction → validator steps the sim. Miners just need to implement better logic inside that contract.
+The IM scoring hooks are already wired in:
+	∙	closeCallTicks — how often the player was near a ghost (tension = fun)
+	∙	escaped — ghosts successfully caught player (ghost AI wins)
+	∙	ghostsCaught — player ate frightened ghosts (ghost AI too easy)
+	∙	calcFunScore() — blends danger + efficiency + survival into 0–100, this is what feeds miner weights
+Key IM design decisions this implies:
+	∙	Miners get penalized if funScore is too low (boring AI, never threatens) OR too high (unfair, instantly kills player) — the target band is roughly 50–75/100
+	∙	Difficulty ramps naturally because ghost speed, frighten duration, and scatter timing all scale with level
+	∙	Validators host this page, stream the live sim state over SSE, and the player’s session metrics get posted back to score the miner whose ghost AI was running
+Want to work out the scoring math for the weight vector next, or refine the game feel first?​​​​​​​​​​​​​​​​
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PacTensor — Ghost AI Arena</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+:root {
+–void: #04040a;
+–deep: #080816;
+–surface: #0d0d22;
+–pellet: #f0e040;
+–player: #f7d020;
+–ghost-1: #ff4466;
+–ghost-2: #22ddff;
+–ghost-3: #ff9922;
+–ghost-4: #cc44ff;
+–frightened: #2244ff;
+–wall: #1a1aff;
+–wall-glow: #3333ff;
+–dot: #ffeeaa;
+–power: #ffffff;
+–text: #e0e0ff;
+–accent: #f7d020;
+–dim: #444466;
+–score-color: #22ffaa;
+–tunnel: #0a0a1a;
+}
+
+- { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+background: var(–void);
+color: var(–text);
+font-family: ‘Press Start 2P’, monospace;
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+align-items: center;
+overflow-x: hidden;
+position: relative;
+}
+
+body::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background:
+radial-gradient(ellipse 60% 40% at 20% 10%, #0a0a3322 0%, transparent 70%),
+radial-gradient(ellipse 40% 60% at 80% 90%, #1a001a22 0%, transparent 70%);
+pointer-events: none;
+z-index: 0;
+}
+
+/* Scanlines */
+body::after {
+content: ‘’;
+position: fixed;
+inset: 0;
+background: repeating-linear-gradient(
+0deg,
+transparent,
+transparent 2px,
+rgba(0,0,0,0.08) 2px,
+rgba(0,0,0,0.08) 4px
+);
+pointer-events: none;
+z-index: 100;
+}
+
+header {
+position: relative;
+z-index: 10;
+text-align: center;
+padding: 18px 20px 10px;
+width: 100%;
+}
+
+.logo {
+font-size: clamp(14px, 3vw, 22px);
+letter-spacing: 4px;
+color: var(–accent);
+text-shadow: 0 0 20px #f7d02088, 0 0 40px #f7d02044;
+animation: pulse-logo 3s ease-in-out infinite;
+}
+
+@keyframes pulse-logo {
+0%, 100% { text-shadow: 0 0 20px #f7d02088, 0 0 40px #f7d02044; }
+50% { text-shadow: 0 0 30px #f7d020cc, 0 0 60px #f7d02066, 0 0 80px #f7d02022; }
+}
+
+.tagline {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 10px;
+color: var(–dim);
+letter-spacing: 2px;
+margin-top: 6px;
+}
+
+.game-shell {
+position: relative;
+z-index: 10;
+display: flex;
+gap: 16px;
+align-items: flex-start;
+padding: 10px 20px 20px;
+width: 100%;
+max-width: 1000px;
+justify-content: center;
+}
+
+/* LEFT PANEL */
+.left-panel {
+display: flex;
+flex-direction: column;
+gap: 10px;
+width: 180px;
+flex-shrink: 0;
+}
+
+.panel-box {
+background: var(–surface);
+border: 1px solid #2a2a55;
+padding: 12px;
+position: relative;
+overflow: hidden;
+}
+.panel-box::before {
+content: ‘’;
+position: absolute;
+top: 0; left: 0; right: 0;
+height: 1px;
+background: linear-gradient(90deg, transparent, #4444aa, transparent);
+}
+
+.panel-label {
+font-size: 6px;
+letter-spacing: 2px;
+color: var(–dim);
+margin-bottom: 8px;
+text-transform: uppercase;
+}
+
+.score-val {
+font-size: 14px;
+color: var(–score-color);
+text-shadow: 0 0 10px #22ffaa88;
+}
+
+.lives-row {
+display: flex;
+gap: 8px;
+flex-wrap: wrap;
+}
+
+.life-icon {
+width: 16px;
+height: 16px;
+}
+
+.level-val {
+font-size: 18px;
+color: var(–ghost-4);
+text-shadow: 0 0 10px #cc44ff88;
+}
+
+/* GHOST ROSTER */
+.ghost-roster { display: flex; flex-direction: column; gap: 6px; }
+.ghost-entry {
+display: flex;
+align-items: center;
+gap: 8px;
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 10px;
+}
+.ghost-swatch {
+width: 10px; height: 10px;
+border-radius: 2px;
+flex-shrink: 0;
+}
+.ghost-name { color: var(–text); flex: 1; }
+.ghost-mode {
+font-size: 8px;
+padding: 1px 4px;
+background: #ffffff11;
+color: var(–dim);
+}
+
+/* AI PANEL */
+.ai-source {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 9px;
+line-height: 1.6;
+color: #7777aa;
+word-break: break-word;
+}
+.ai-source .highlight { color: var(–score-color); }
+
+/* METRICS */
+.metric-row {
+display: flex;
+justify-content: space-between;
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 9px;
+margin-bottom: 4px;
+}
+.metric-key { color: var(–dim); }
+.metric-val { color: var(–text); }
+
+/* CANVAS AREA */
+.canvas-wrap {
+position: relative;
+flex-shrink: 0;
+}
+
+canvas#game {
+display: block;
+image-rendering: pixelated;
+border: 2px solid #2a2a66;
+box-shadow:
+0 0 30px #1a1aff33,
+0 0 60px #1a1aff11,
+inset 0 0 30px #00002244;
+}
+
+/* OVERLAY */
+.overlay {
+position: absolute;
+inset: 0;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+background: rgba(4,4,10,0.92);
+z-index: 50;
+}
+.overlay.hidden { display: none; }
+
+.overlay-title {
+font-size: clamp(10px, 2.5vw, 16px);
+color: var(–accent);
+text-shadow: 0 0 20px #f7d02099;
+margin-bottom: 16px;
+text-align: center;
+}
+
+.overlay-sub {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 11px;
+color: var(–dim);
+margin-bottom: 24px;
+text-align: center;
+line-height: 1.8;
+}
+
+.btn {
+background: transparent;
+border: 1px solid var(–accent);
+color: var(–accent);
+font-family: ‘Press Start 2P’, monospace;
+font-size: 9px;
+padding: 10px 20px;
+cursor: pointer;
+letter-spacing: 2px;
+transition: all 0.15s;
+position: relative;
+overflow: hidden;
+}
+.btn::before {
+content: ‘’;
+position: absolute;
+inset: 0;
+background: var(–accent);
+opacity: 0;
+transition: opacity 0.15s;
+}
+.btn:hover { color: var(–void); }
+.btn:hover::before { opacity: 1; }
+.btn span { position: relative; z-index: 1; }
+
+/* RIGHT PANEL */
+.right-panel {
+display: flex;
+flex-direction: column;
+gap: 10px;
+width: 180px;
+flex-shrink: 0;
+}
+
+/* HIGH SCORES */
+.hiscore-list { display: flex; flex-direction: column; gap: 5px; }
+.hiscore-entry {
+display: flex;
+justify-content: space-between;
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 9px;
+}
+.hiscore-rank { color: var(–dim); width: 20px; }
+.hiscore-name { color: var(–text); flex: 1; }
+.hiscore-score { color: var(–score-color); }
+
+/* CONTROLS */
+.controls-list {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 9px;
+color: var(–dim);
+line-height: 2;
+}
+.controls-list .key {
+display: inline-block;
+background: #1a1a33;
+border: 1px solid #333355;
+padding: 0 4px;
+color: var(–text);
+margin-right: 4px;
+}
+
+/* SUBNET STATUS */
+.subnet-status {
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 9px;
+line-height: 1.8;
+}
+.status-row { display: flex; justify-content: space-between; }
+.status-key { color: var(–dim); }
+.status-live { color: #22ffaa; }
+.status-val { color: var(–text); }
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* FOOTER */
+footer {
+position: relative; z-index: 10;
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 8px;
+color: var(–dim);
+text-align: center;
+padding: 10px 20px 20px;
+letter-spacing: 1px;
+}
+
+/* DIFFICULTY FLASH */
+#diff-flash {
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+font-size: 12px;
+color: var(–ghost-1);
+text-shadow: 0 0 20px #ff4466;
+pointer-events: none;
+opacity: 0;
+transition: opacity 0.3s;
+z-index: 60;
+text-align: center;
+white-space: nowrap;
+}
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="logo">● PAC<span style="color:#cc44ff">TENSOR</span> ●</div>
+  <div class="tagline">ghost ai powered by bittensor subnet · compete for emissions</div>
+</header>
+
+<div class="game-shell">
+
+  <!-- LEFT -->
+
+  <div class="left-panel">
+    <div class="panel-box">
+      <div class="panel-label">Score</div>
+      <div class="score-val" id="score-display">000000</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Lives</div>
+      <div class="lives-row" id="lives-display"></div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Level</div>
+      <div class="level-val" id="level-display">01</div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Ghosts</div>
+      <div class="ghost-roster" id="ghost-roster"></div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">AI Source</div>
+      <div class="ai-source">
+        Miner: <span class="highlight" id="miner-id">baseline-v0</span><br>
+        Algo: <span class="highlight">BFS+scatter</span><br>
+        Score: <span class="highlight" id="miner-score">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+
+  <div class="canvas-wrap">
+    <canvas id="game"></canvas>
+    <div id="diff-flash"></div>
+
+```
+<!-- START OVERLAY -->
+<div class="overlay" id="overlay-start">
+  <div class="overlay-title">PAC<span style="color:#cc44ff">TENSOR</span></div>
+  <div class="overlay-sub">
+    Ghosts are powered by Bittensor miners.<br>
+    Each level: harder AI, randomized maze.<br>
+    Your performance scores the ghost AI.<br><br>
+    <span style="color:#f7d020">ARROW KEYS or WASD to move</span>
+  </div>
+  <button class="btn" onclick="startGame()"><span>INSERT COIN</span></button>
+</div>
+
+<!-- PAUSE OVERLAY -->
+<div class="overlay hidden" id="overlay-pause">
+  <div class="overlay-title">PAUSED</div>
+  <div class="overlay-sub">Press P to resume</div>
+</div>
+
+<!-- DEAD OVERLAY -->
+<div class="overlay hidden" id="overlay-dead">
+  <div class="overlay-title" id="dead-title">CONSUMED</div>
+  <div class="overlay-sub" id="dead-sub"></div>
+  <button class="btn" onclick="resumeAfterDeath()"><span>CONTINUE</span></button>
+</div>
+
+<!-- LEVEL COMPLETE -->
+<div class="overlay hidden" id="overlay-level">
+  <div class="overlay-title">SECTOR CLEARED</div>
+  <div class="overlay-sub" id="level-sub"></div>
+  <button class="btn" onclick="nextLevel()"><span>NEXT LEVEL</span></button>
+</div>
+
+<!-- GAME OVER -->
+<div class="overlay hidden" id="overlay-gameover">
+  <div class="overlay-title" style="color:#ff4466">GAME OVER</div>
+  <div class="overlay-sub" id="gameover-sub"></div>
+  <button class="btn" onclick="resetGame()"><span>TRY AGAIN</span></button>
+</div>
+```
+
+  </div>
+
+  <!-- RIGHT -->
+
+  <div class="right-panel">
+    <div class="panel-box">
+      <div class="panel-label">Subnet Live</div>
+      <div class="subnet-status">
+        <div class="status-row">
+          <span class="status-key">miners</span>
+          <span class="status-live">●<span class="blink"> </span>192</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">validators</span>
+          <span class="status-val">47</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">tempo</span>
+          <span class="status-val" id="tempo-display">360</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">emissions</span>
+          <span class="status-val">TAO/hr</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Session Metrics</div>
+      <div id="metrics-panel">
+        <div class="metric-row"><span class="metric-key">deaths</span><span class="metric-val" id="m-deaths">0</span></div>
+        <div class="metric-row"><span class="metric-key">pellets</span><span class="metric-val" id="m-pellets">0</span></div>
+        <div class="metric-row"><span class="metric-key">time</span><span class="metric-val" id="m-time">0s</span></div>
+        <div class="metric-row"><span class="metric-key">caught</span><span class="metric-val" id="m-caught">0</span></div>
+        <div class="metric-row"><span class="metric-key">escaped</span><span class="metric-val" id="m-escaped">0</span></div>
+        <div class="metric-row"><span class="metric-key">fun-score</span><span class="metric-val" id="m-fun" style="color:#f7d020">—</span></div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Top Miners</div>
+      <div class="hiscore-list" id="hiscore-list"></div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Controls</div>
+      <div class="controls-list">
+        <span class="key">↑↓←→</span> move<br>
+        <span class="key">WASD</span> move<br>
+        <span class="key">P</span> pause<br>
+        <span class="key">R</span> restart
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  PACTENSOR v0.1 · BITTENSOR SUBNET DEMO · GHOST AI = MINER SUBNET EMISSIONS · NON-AFFIL. WITH NAMCO
+</footer>
+
+<script>
+// ============================================================
+// PACTENSOR — Full Game Engine
+// ============================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// Responsive sizing
+const CELL = 20;
+const COLS = 21;
+const ROWS = 23;
+canvas.width = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+// ---- TILE TYPES ----
+const T = { WALL:0, DOT:1, POWER:2, EMPTY:3, TUNNEL:4, GHOST_HOME:5 };
+
+// ---- COLORS ----
+const GHOST_COLORS = ['#ff4466','#22ddff','#ff9922','#cc44ff'];
+const GHOST_NAMES  = ['VECTOR','NEXUS','PULSE','DRIFT'];
+
+// ---- GAME STATE ----
+let G = {};
+
+function makeInitialState() {
+  return {
+    score: 0,
+    lives: 3,
+    level: 1,
+    paused: false,
+    running: false,
+    dead: false,
+    dotsLeft: 0,
+    // metrics
+    deaths: 0,
+    pelletsEaten: 0,
+    timeStart: Date.now(),
+    ghostsCaught: 0,
+    escaped: 0,
+    closeCallTicks: 0,
+  };
+}
+
+// ---- MAZE GENERATION ----
+// We generate a symmetric maze using recursive division, then overlay
+// a fixed ghost-house in the center.
+
+function buildMaze(seed) {
+  const rng = seededRng(seed);
+  const grid = [];
+  for (let r = 0; r < ROWS; r++) {
+    grid.push(new Array(COLS).fill(T.WALL));
+  }
+
+  // carve passages using randomized DFS
+  function carve(r, c) {
+    const dirs = shuffle([[0,2],[0,-2],[2,0],[-2,0]], rng);
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr > 0 && nr < ROWS-1 && nc > 0 && nc < COLS-1 && grid[nr][nc] === T.WALL) {
+        grid[r + dr/2][c + dc/2] = T.DOT;
+        grid[nr][nc] = T.DOT;
+        carve(nr, nc);
+      }
+    }
+  }
+
+  // Start carving from (1,1)
+  grid[1][1] = T.DOT;
+  carve(1, 1);
+
+  // Mirror left→right for symmetry
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < Math.floor(COLS/2); c++) {
+      grid[r][COLS-1-c] = grid[r][c];
+    }
+  }
+
+  // Ensure border walls
+  for (let r = 0; r < ROWS; r++) {
+    grid[r][0] = T.WALL;
+    grid[r][COLS-1] = T.WALL;
+  }
+  for (let c = 0; c < COLS; c++) {
+    grid[0][c] = T.WALL;
+    grid[ROWS-1][c] = T.WALL;
+  }
+
+  // Ghost house in center
+  const hc = Math.floor(COLS/2), hr = Math.floor(ROWS/2);
+  for (let r = hr-2; r <= hr+1; r++)
+    for (let c = hc-3; c <= hc+3; c++)
+      grid[r][c] = T.GHOST_HOME;
+  // Door
+  grid[hr-2][hc-1] = T.EMPTY;
+  grid[hr-2][hc]   = T.EMPTY;
+  grid[hr-2][hc+1] = T.EMPTY;
+
+  // Tunnels on left/right edges row ROWS/2
+  const tunnelRow = Math.floor(ROWS/2) + 1;
+  grid[tunnelRow][0] = T.TUNNEL;
+  grid[tunnelRow][COLS-1] = T.TUNNEL;
+  // Make sure tunnel path connects
+  for (let c = 0; c < COLS; c++) grid[tunnelRow][c] = c === 0 || c === COLS-1 ? T.TUNNEL : T.DOT;
+
+  // Place power pellets in corners-ish
+  const powerSpots = [
+    [1,1],[1,COLS-2],[ROWS-2,1],[ROWS-2,COLS-2]
+  ];
+  for (const [r,c] of powerSpots) {
+    if (grid[r][c] === T.DOT) grid[r][c] = T.POWER;
+  }
+
+  // Open space around player start
+  const pr = ROWS-3, pc = Math.floor(COLS/2);
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++)
+      if (grid[pr+dr]?.[pc+dc] === T.WALL) grid[pr+dr][pc+dc] = T.DOT;
+
+  return grid;
+}
+
+// ---- MAZE STATE (dots) ----
+let mazeBase = [];  // original tile types (never mutated)
+let maze = [];      // live (dots eaten, etc.)
+
+function initMaze(seed) {
+  mazeBase = buildMaze(seed);
+  maze = mazeBase.map(row => [...row]);
+  G.dotsLeft = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (maze[r][c] === T.DOT || maze[r][c] === T.POWER) G.dotsLeft++;
+}
+
+// ---- PLAYER ----
+let player = {};
+function initPlayer() {
+  player = {
+    r: ROWS-3, c: Math.floor(COLS/2),
+    px: 0, py: 0,  // sub-cell pixel position
+    dir: {dr:0, dc:0},
+    nextDir: {dr:0, dc:-1},
+    speed: 2.0,      // pixels per frame (increases with level)
+    mouthAngle: 0,
+    mouthDir: 1,
+    moving: false,
+    invincible: 0,
+    // precise float position
+    fr: ROWS-3, fc: Math.floor(COLS/2),
+  };
+}
+
+// ---- GHOSTS ----
+let ghosts = [];
+const GHOST_HOME_R = Math.floor(ROWS/2);
+const GHOST_HOME_C = Math.floor(COLS/2);
+
+// MODES
+const MODE_SCATTER = 'scatter';
+const MODE_CHASE   = 'chase';
+const MODE_FRIGHT  = 'fright';
+const MODE_EATEN   = 'eaten';
+const MODE_HOME    = 'home';
+const MODE_LEAVE   = 'leave';
+
+// Ghost AI — this is the "miner baseline" script
+// Miners replace the chase() function per ghost via the subnet
+function ghostAI_baseline(ghost, player, maze, level) {
+  const intensity = Math.min(level / 5, 1.0); // ramps 0→1 over 5 levels
+  switch (ghost.mode) {
+    case MODE_CHASE:   return ai_chase(ghost, player, maze, intensity, ghost.id);
+    case MODE_SCATTER: return ai_scatter(ghost);
+    case MODE_FRIGHT:  return ai_fright(ghost, player, maze);
+    case MODE_EATEN:   return ai_return(ghost);
+    case MODE_HOME:    return {dr:0, dc:0};
+    case MODE_LEAVE:   return ai_leave(ghost);
+  }
+}
+
+function ai_chase(ghost, player, maze, intensity, id) {
+  // Each ghost has a distinct chase strategy (classic archetypes, renamed)
+  // VECTOR (0) — direct BFS to player
+  // NEXUS (1) — ambush: target 4 ahead of player
+  // PULSE (2) — flanking
+  // DRIFT (3) — random + attracted when far
+  let target;
+  if (id === 0) {
+    target = {r: player.r, c: player.c};
+  } else if (id === 1) {
+    target = {r: player.r + player.dir.dr*4, c: player.c + player.dir.dc*4};
+    target.r = clamp(target.r, 0, ROWS-1);
+    target.c = clamp(target.c, 0, COLS-1);
+  } else if (id === 2) {
+    const dx = player.c - ghost.c, dy = player.r - ghost.r;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 8 * (1 - intensity*0.5)) {
+      target = {r: player.r, c: player.c};
+    } else {
+      target = ai_scatter(ghost);
+    }
+    return bfsDir(ghost, target, maze);
+  } else {
+    // Drift: random with bias toward player at high intensity
+    if (Math.random() < intensity) {
+      target = {r: player.r, c: player.c};
+    } else {
+      // random open neighbor
+      const opts = openNeighbors(ghost.r, ghost.c, maze)
+        .filter(n => n.dr !== -ghost.dir.dr || n.dc !== -ghost.dir.dc);
+      if (opts.length) return opts[Math.floor(Math.random()*opts.length)];
+      return ghost.dir;
+    }
+  }
+  return bfsDir(ghost, target, maze);
+}
+
+function ai_scatter(ghost) {
+  const corners = [
+    {r:1, c:1}, {r:1, c:COLS-2}, {r:ROWS-2, c:1}, {r:ROWS-2, c:COLS-2}
+  ];
+  return bfsDir(ghost, corners[ghost.id % 4], maze);
+}
+
+function ai_fright(ghost, player, maze) {
+  // Run away from player
+  const opts = openNeighbors(ghost.r, ghost.c, maze)
+    .filter(n => n.dr !== -ghost.dir.dr || n.dc !== -ghost.dir.dc);
+  if (!opts.length) return ghost.dir;
+  // pick direction that maximizes distance from player
+  opts.sort((a,b) => {
+    const da = dist2(ghost.r+a.dr, ghost.c+a.dc, player.r, player.c);
+    const db = dist2(ghost.r+b.dr, ghost.c+b.dc, player.r, player.c);
+    return db - da;
+  });
+  return opts[0];
+}
+
+function ai_return(ghost) {
+  return bfsDir(ghost, {r: GHOST_HOME_R, c: GHOST_HOME_C}, maze);
+}
+
+function ai_leave(ghost) {
+  // Move toward exit
+  return bfsDir(ghost, {r: GHOST_HOME_R-2, c: GHOST_HOME_C}, maze);
+}
+
+// BFS pathfinding
+function bfsDir(ghost, target, maze) {
+  const visited = new Set();
+  const queue = [{r:ghost.r, c:ghost.c, dir:null}];
+  visited.add(`${ghost.r},${ghost.c}`);
+  while (queue.length) {
+    const {r, c, dir} = queue.shift();
+    if (r === target.r && c === target.c) return dir || ghost.dir;
+    for (const n of openNeighbors(r, c, maze)) {
+      const key = `${r+n.dr},${c+n.dc}`;
+      if (!visited.has(key)) {
+        visited.add(key);
+        queue.push({r:r+n.dr, c:c+n.dc, dir: dir || n});
+      }
+    }
+  }
+  // fallback: random open
+  const opts = openNeighbors(ghost.r, ghost.c, maze);
+  return opts.length ? opts[Math.floor(Math.random()*opts.length)] : {dr:0, dc:0};
+}
+
+function openNeighbors(r, c, maze) {
+  const dirs = [{dr:-1,dc:0},{dr:1,dc:0},{dr:0,dc:-1},{dr:0,dc:1}];
+  return dirs.filter(({dr,dc}) => {
+    const nr = r+dr, nc = c+dc;
+    if (nr<0||nr>=ROWS||nc<0||nc>=COLS) return false;
+    const t = maze[nr][nc];
+    return t !== T.WALL;
+  });
+}
+
+function initGhosts(level) {
+  const speed = 1.4 + level * 0.18;
+  ghosts = GHOST_NAMES.map((name, i) => ({
+    id: i, name,
+    r: GHOST_HOME_R + (i < 2 ? 0 : 1),
+    c: GHOST_HOME_C + (i % 2 === 0 ? -1 : 1),
+    fr: GHOST_HOME_R + (i < 2 ? 0 : 1),
+    fc: GHOST_HOME_C + (i % 2 === 0 ? -1 : 1),
+    dir: {dr:0, dc: i%2===0?-1:1},
+    mode: i === 0 ? MODE_LEAVE : MODE_HOME,
+    frightened: false,
+    frightenTimer: 0,
+    homeTimer: i * 120,  // stagger release
+    speed: speed * (0.9 + i*0.05),
+    eaten: false,
+    blinkPhase: 0,
+  }));
+}
+
+// Mode schedule (frames)
+let modeTimer = 0;
+let globalMode = MODE_SCATTER;
+const MODE_SCHEDULE = [
+  {mode: MODE_SCATTER, dur: 420},
+  {mode: MODE_CHASE,   dur: 1200},
+  {mode: MODE_SCATTER, dur: 300},
+  {mode: MODE_CHASE,   dur: 1200},
+  {mode: MODE_SCATTER, dur: 240},
+  {mode: MODE_CHASE,   dur: 99999},
+];
+let modeIdx = 0;
+
+// ---- POWER PELLET STATE ----
+let frightenTimer = 0;
+const FRIGHTEN_DUR = 360; // frames at level 1, decreases
+
+// ---- ANIMATION LOOP ----
+let animId = null;
+let lastTime = 0;
+const TARGET_FPS = 60;
+const FRAME_MS = 1000 / TARGET_FPS;
+
+function gameLoop(ts) {
+  animId = requestAnimationFrame(gameLoop);
+  const dt = ts - lastTime;
+  if (dt < FRAME_MS * 0.8) return;
+  lastTime = ts;
+  if (!G.running || G.paused || G.dead) return;
+  update();
+  draw();
+}
+
+// ---- UPDATE ----
+let frameCount = 0;
+
+function update() {
+  frameCount++;
+
+  // Mode schedule
+  modeTimer++;
+  const sched = MODE_SCHEDULE[modeIdx];
+  if (modeTimer >= sched.dur && modeIdx < MODE_SCHEDULE.length-1) {
+    modeIdx++;
+    globalMode = MODE_SCHEDULE[modeIdx].mode;
+    modeTimer = 0;
+    // Switch non-frightened, non-eaten, non-home ghosts
+    for (const g of ghosts) {
+      if (g.mode !== MODE_FRIGHT && g.mode !== MODE_EATEN && g.mode !== MODE_HOME && g.mode !== MODE_LEAVE) {
+        g.mode = globalMode;
+      }
+    }
+  }
+
+  // Frighten timer
+  if (frightenTimer > 0) {
+    frightenTimer--;
+    if (frightenTimer === 0) {
+      for (const g of ghosts) {
+        if (g.mode === MODE_FRIGHT) g.mode = globalMode;
+      }
+    }
+  }
+
+  // Ghost home timers
+  for (const g of ghosts) {
+    if (g.mode === MODE_HOME) {
+      g.homeTimer--;
+      if (g.homeTimer <= 0) g.mode = MODE_LEAVE;
+    }
+  }
+
+  // Move player
+  movePlayer();
+
+  // Move ghosts
+  for (const g of ghosts) {
+    moveGhost(g);
+  }
+
+  // Check dot collection
+  const pr = Math.round(player.fr), pc = Math.round(player.fc);
+  if (pr >= 0 && pr < ROWS && pc >= 0 && pc < COLS) {
+    if (maze[pr][pc] === T.DOT) {
+      maze[pr][pc] = T.EMPTY;
+      G.score += 10;
+      G.dotsLeft--;
+      G.pelletsEaten++;
+      if (G.dotsLeft === 0) triggerLevelComplete();
+    } else if (maze[pr][pc] === T.POWER) {
+      maze[pr][pc] = T.EMPTY;
+      G.score += 50;
+      G.dotsLeft--;
+      G.pelletsEaten++;
+      triggerFrighten();
+      if (G.dotsLeft === 0) triggerLevelComplete();
+    }
+  }
+
+  // Collision detection
+  checkCollisions();
+
+  // Update metrics
+  updateMetricsDisplay();
+
+  // Player invincibility frames
+  if (player.invincible > 0) player.invincible--;
+
+  // Update ghost mouth / animations
+  player.mouthAngle += player.mouthDir * 4;
+  if (player.mouthAngle > 35) player.mouthDir = -1;
+  if (player.mouthAngle < 2)  player.mouthDir = 1;
+}
+
+function movePlayer() {
+  // Try to turn in nextDir
+  const nr = Math.round(player.fr) + player.nextDir.dr;
+  const nc = Math.round(player.fc) + player.nextDir.dc;
+  if (canMove(nr, nc)) {
+    player.dir = {...player.nextDir};
+  }
+
+  const targetR = Math.round(player.fr) + player.dir.dr;
+  const targetC = Math.round(player.fc) + player.dir.dc;
+  const speed = (1.5 + G.level * 0.1) / CELL;
+
+  if (canMove(targetR, targetC) || (player.dir.dr === 0 && player.dir.dc === 0)) {
+    player.fr += player.dir.dr * speed;
+    player.fc += player.dir.dc * speed;
+    player.moving = true;
+  } else {
+    player.moving = false;
+  }
+
+  // Tunnel wrap
+  if (player.fc < 0) player.fc = COLS - 1;
+  if (player.fc >= COLS) player.fc = 0;
+  player.r = Math.round(player.fr);
+  player.c = Math.round(player.fc);
+}
+
+function moveGhost(g) {
+  if (g.mode === MODE_HOME) return;
+
+  const speed = g.speed / CELL * (g.mode === MODE_FRIGHT ? 0.55 : g.mode === MODE_EATEN ? 1.8 : 1.0);
+
+  // At cell center, pick new direction
+  const cr = Math.round(g.fr), cc = Math.round(g.fc);
+  if (Math.abs(g.fr - cr) < speed * 1.2 && Math.abs(g.fc - cc) < speed * 1.2) {
+    g.fr = cr; g.fc = cc; g.r = cr; g.c = cc;
+    const newDir = ghostAI_baseline(g, player, maze, G.level);
+    if (newDir) {
+      const nr = cr + newDir.dr, nc = cc + newDir.dc;
+      if (nr>=0 && nr<ROWS && nc>=0 && nc<COLS && maze[nr][nc] !== T.WALL) {
+        g.dir = newDir;
+      }
+    }
+
+    // Check if returned home
+    if (g.mode === MODE_EATEN && cr === GHOST_HOME_R && cc === GHOST_HOME_C) {
+      g.mode = globalMode;
+      g.eaten = false;
+    }
+    // Check if left home
+    if (g.mode === MODE_LEAVE && cr === GHOST_HOME_R-2 && Math.abs(cc - GHOST_HOME_C) <= 1) {
+      g.mode = globalMode;
+    }
+  }
+
+  g.fr += g.dir.dr * speed;
+  g.fc += g.dir.dc * speed;
+
+  // Tunnel wrap
+  if (g.fc < 0) g.fc = COLS - 1;
+  if (g.fc >= COLS) g.fc = 0;
+  g.r = Math.round(g.fr);
+  g.c = Math.round(g.fc);
+}
+
+function canMove(r, c) {
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true; // tunnel
+  return maze[r][c] !== T.WALL && maze[r][c] !== T.GHOST_HOME;
+}
+
+function checkCollisions() {
+  if (player.invincible > 0) return;
+  for (const g of ghosts) {
+    if (g.mode === MODE_EATEN) continue;
+    const dr = Math.abs(g.fr - player.fr);
+    const dc = Math.abs(g.fc - player.fc);
+    if (dr < 0.7 && dc < 0.7) {
+      if (g.mode === MODE_FRIGHT) {
+        eatGhost(g);
+      } else {
+        killPlayer();
+        return;
+      }
+    } else if (dr < 1.2 && dc < 1.2) {
+      G.closeCallTicks++;
+    }
+  }
+}
+
+let ghostEatCombo = 0;
+const EAT_SCORES = [200,400,800,1600];
+
+function eatGhost(g) {
+  g.mode = MODE_EATEN;
+  g.eaten = true;
+  const pts = EAT_SCORES[Math.min(ghostEatCombo, 3)];
+  ghostEatCombo++;
+  G.score += pts;
+  G.ghostsCaught++;
+  showFloatingScore(g.fc, g.fr, '+'+pts, GHOST_COLORS[g.id]);
+}
+
+function killPlayer() {
+  G.lives--;
+  G.deaths++;
+  G.escaped++; // ghost escaped (caught player)
+  G.dead = true;
+  player.invincible = 180;
+
+  const sub = G.lives > 0
+    ? `Lives remaining: ${G.lives}\nGhost caught you!`
+    : '';
+
+  if (G.lives <= 0) {
+    setTimeout(() => showGameOver(), 600);
+  } else {
+    document.getElementById('dead-title').textContent = 'CONSUMED!';
+    document.getElementById('dead-sub').textContent = `Lives remaining: ${G.lives}`;
+    document.getElementById('overlay-dead').classList.remove('hidden');
+  }
+  updateHUD();
+}
+
+function triggerFrighten() {
+  const dur = Math.max(120, FRIGHTEN_DUR - G.level * 30);
+  frightenTimer = dur;
+  ghostEatCombo = 0;
+  for (const g of ghosts) {
+    if (g.mode !== MODE_EATEN && g.mode !== MODE_HOME && g.mode !== MODE_LEAVE) {
+      g.mode = MODE_FRIGHT;
+    }
+  }
+}
+
+function triggerLevelComplete() {
+  G.running = false;
+  const funScore = calcFunScore();
+  document.getElementById('level-sub').textContent =
+    `Level ${G.level} cleared!\nFun Score: ${funScore}/100\nGhosts eaten: ${G.ghostsCaught}`;
+  document.getElementById('m-fun').textContent = funScore;
+  document.getElementById('overlay-level').classList.remove('hidden');
+}
+
+// ---- FUN SCORE (this feeds miner weights) ----
+function calcFunScore() {
+  const elapsed = (Date.now() - G.timeStart) / 1000;
+  // Danger metric: close calls per second
+  const danger = Math.min(G.closeCallTicks / Math.max(elapsed, 1) * 10, 40);
+  // Efficiency: pellets per second
+  const efficiency = Math.min(G.pelletsEaten / Math.max(elapsed, 1) * 5, 30);
+  // Survival: didn't die too much
+  const survival = Math.max(0, 30 - G.deaths * 10);
+  return Math.round(danger + efficiency + survival);
+}
+
+// ---- FLOATING SCORES ----
+let floats = [];
+function showFloatingScore(fc, fr, text, color) {
+  floats.push({fc, fr, text, color, life: 60});
+}
+
+// ---- DRAW ----
+function draw() {
+  ctx.fillStyle = '#04040a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawMaze();
+  drawDots();
+  drawGhosts();
+  drawPlayer();
+  drawFloats();
+}
+
+function drawMaze() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (mazeBase[r][c] === T.WALL) {
+        // Wall fill
+        ctx.fillStyle = '#0a0a33';
+        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+
+        // Glow outline
+        ctx.strokeStyle = '#2222cc';
+        ctx.lineWidth = 1.5;
+        drawWallSegment(r, c);
+      } else if (mazeBase[r][c] === T.GHOST_HOME) {
+        ctx.fillStyle = '#0d0d1e';
+        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+      }
+    }
+  }
+  // Ghost house door highlight
+  const hr = GHOST_HOME_R-2, hc = GHOST_HOME_C;
+  ctx.fillStyle = '#ffaaff44';
+  ctx.fillRect((hc-1)*CELL, hr*CELL, 3*CELL, 2);
+}
+
+function drawWallSegment(r, c) {
+  const x = c*CELL, y = r*CELL;
+  const s = CELL;
+  // Only draw borders adjacent to non-wall cells for cleaner look
+  const adj = (dr, dc) => {
+    const nr = r+dr, nc = c+dc;
+    if (nr<0||nr>=ROWS||nc<0||nc>=COLS) return false;
+    return mazeBase[nr][nc] !== T.WALL;
+  };
+  ctx.beginPath();
+  if (adj(-1,0)) { ctx.moveTo(x,y); ctx.lineTo(x+s,y); }
+  if (adj(1,0))  { ctx.moveTo(x,y+s); ctx.lineTo(x+s,y+s); }
+  if (adj(0,-1)) { ctx.moveTo(x,y); ctx.lineTo(x,y+s); }
+  if (adj(0,1))  { ctx.moveTo(x+s,y); ctx.lineTo(x+s,y+s); }
+  ctx.stroke();
+}
+
+function drawDots() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const t = maze[r][c];
+      const cx2 = c*CELL + CELL/2, cy2 = r*CELL + CELL/2;
+      if (t === T.DOT) {
+        ctx.fillStyle = '#ffeeaa';
+        ctx.beginPath();
+        ctx.arc(cx2, cy2, 2, 0, Math.PI*2);
+        ctx.fill();
+      } else if (t === T.POWER) {
+        const pulse = (Math.sin(frameCount * 0.15) + 1) * 0.5;
+        const rad = 4 + pulse * 2;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 10 + pulse * 10;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(cx2, cy2, rad, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+}
+
+function drawPlayer() {
+  const x = player.fc * CELL + CELL/2;
+  const y = player.fr * CELL + CELL/2;
+  const r = CELL * 0.44;
+
+  // Blink when invincible
+  if (player.invincible > 0 && Math.floor(player.invincible / 8) % 2 === 0) return;
+
+  // Determine angle based on direction
+  let angle = 0;
+  if (player.dir.dc === 1)  angle = 0;
+  if (player.dir.dc === -1) angle = Math.PI;
+  if (player.dir.dr === -1) angle = -Math.PI/2;
+  if (player.dir.dr === 1)  angle = Math.PI/2;
+
+  const mRad = (player.mouthAngle / 180) * Math.PI;
+
+  ctx.shadowColor = '#f7d020';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#f7d020';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r, angle + mRad, angle + Math.PI*2 - mRad);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Eye
+  const eyeX = x + Math.cos(angle - Math.PI/4) * r * 0.45;
+  const eyeY = y + Math.sin(angle - Math.PI/4) * r * 0.45;
+  ctx.fillStyle = '#04040a';
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, 2, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawGhosts() {
+  for (const g of ghosts) {
+    if (g.mode === MODE_HOME && g.homeTimer > 180) continue;
+    drawGhost(g);
+  }
+}
+
+function drawGhost(g) {
+  const x = g.fc * CELL + CELL/2;
+  const y = g.fr * CELL + CELL/2;
+  const r = CELL * 0.42;
+
+  let col;
+  if (g.mode === MODE_FRIGHT) {
+    const blinking = frightenTimer < 120 && Math.floor(frightenTimer/10)%2;
+    col = blinking ? '#ffffff' : '#2244ff';
+  } else if (g.mode === MODE_EATEN) {
+    col = '#ffffff44';
+  } else {
+    col = GHOST_COLORS[g.id];
+  }
+
+  ctx.shadowColor = col;
+  ctx.shadowBlur = g.mode === MODE_EATEN ? 0 : 8;
+  ctx.fillStyle = col;
+
+  // Ghost body
+  ctx.beginPath();
+  ctx.arc(x, y - r*0.1, r, Math.PI, 0);
+  // Wavy bottom
+  const steps = 3;
+  const sw = (r*2) / steps;
+  for (let i = 0; i <= steps; i++) {
+    const bx = x - r + i * sw;
+    const by = y + r * 0.9 + (i%2===0 ? -r*0.3 : r*0.1);
+    i === 0 ? ctx.lineTo(bx, by) : ctx.lineTo(bx, by);
+  }
+  ctx.lineTo(x - r, y - r*0.1);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Eyes
+  if (g.mode !== MODE_FRIGHT || frightenTimer < 120 && Math.floor(frightenTimer/10)%2) {
+    if (g.mode === MODE_FRIGHT) {
+      // X eyes when frightened
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 2; i++) {
+        const ex = x - 5 + i*10;
+        ctx.beginPath();
+        ctx.moveTo(ex-3, y-5); ctx.lineTo(ex+3, y-1);
+        ctx.moveTo(ex+3, y-5); ctx.lineTo(ex-3, y-1);
+        ctx.stroke();
+      }
+    } else {
+      for (let i = 0; i < 2; i++) {
+        const ex = x - 5 + i*10;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(ex, y-3, 3.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#0011ff';
+        const px2 = ex + g.dir.dc*2;
+        const py2 = (y-3) + g.dir.dr*2;
+        ctx.beginPath(); ctx.arc(px2, py2, 2, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+}
+
+function drawFloats() {
+  for (let i = floats.length-1; i >= 0; i--) {
+    const f = floats[i];
+    f.life--;
+    f.fr -= 0.3;
+    if (f.life <= 0) { floats.splice(i,1); continue; }
+    ctx.globalAlpha = f.life / 60;
+    ctx.fillStyle = f.color;
+    ctx.font = '7px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, f.fc * CELL + CELL/2, f.fr * CELL);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---- HUD ----
+function updateHUD() {
+  document.getElementById('score-display').textContent = String(G.score).padStart(6,'0');
+  document.getElementById('level-display').textContent = String(G.level).padStart(2,'0');
+
+  // Lives icons (drawn as mini pac-mans)
+  const livesEl = document.getElementById('lives-display');
+  livesEl.innerHTML = '';
+  for (let i = 0; i < G.lives; i++) {
+    const c2 = document.createElement('canvas');
+    c2.width = 16; c2.height = 16;
+    c2.className = 'life-icon';
+    const cx2 = c2.getContext('2d');
+    cx2.fillStyle = '#f7d020';
+    cx2.beginPath();
+    cx2.moveTo(8,8);
+    cx2.arc(8,8,7,0.3,Math.PI*2-0.3);
+    cx2.closePath();
+    cx2.fill();
+    livesEl.appendChild(c2);
+  }
+
+  // Ghost roster
+  const roster = document.getElementById('ghost-roster');
+  roster.innerHTML = '';
+  for (const g of ghosts) {
+    const div = document.createElement('div');
+    div.className = 'ghost-entry';
+    div.innerHTML = `
+      <div class="ghost-swatch" style="background:${GHOST_COLORS[g.id]}"></div>
+      <span class="ghost-name">${g.name}</span>
+      <span class="ghost-mode">${g.mode.slice(0,3).toUpperCase()}</span>
+    `;
+    roster.appendChild(div);
+  }
+}
+
+function updateMetricsDisplay() {
+  if (frameCount % 30 !== 0) return; // every 0.5s
+  const elapsed = Math.round((Date.now() - G.timeStart) / 1000);
+  document.getElementById('m-deaths').textContent = G.deaths;
+  document.getElementById('m-pellets').textContent = G.pelletsEaten;
+  document.getElementById('m-time').textContent = elapsed + 's';
+  document.getElementById('m-caught').textContent = G.ghostsCaught;
+  document.getElementById('m-escaped').textContent = G.escaped;
+  document.getElementById('score-display').textContent = String(G.score).padStart(6,'0');
+  updateHUD();
+}
+
+// ---- GAME FLOW ----
+function startGame() {
+  document.getElementById('overlay-start').classList.add('hidden');
+  G = makeInitialState();
+  beginLevel();
+}
+
+function beginLevel() {
+  const seed = G.level * 7919 + 42;
+  initMaze(seed);
+  initPlayer();
+  initGhosts(G.level);
+  modeTimer = 0;
+  modeIdx = 0;
+  globalMode = MODE_SCATTER;
+  frightenTimer = 0;
+  floats = [];
+  frameCount = 0;
+  G.timeStart = Date.now();
+  G.running = true;
+  G.dead = false;
+  ghostEatCombo = 0;
+  updateHUD();
+  showDiffFlash(`LEVEL ${G.level} — ${getDiffLabel()}`);
+}
+
+function getDiffLabel() {
+  if (G.level === 1) return 'BASELINE AI';
+  if (G.level <= 3) return 'IMPROVING...';
+  if (G.level <= 6) return 'ADVANCED MINERS';
+  return 'ELITE SUBNET AI';
+}
+
+function showDiffFlash(text) {
+  const el = document.getElementById('diff-flash');
+  el.textContent = text;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+function resumeAfterDeath() {
+  document.getElementById('overlay-dead').classList.add('hidden');
+  initPlayer();
+  initGhosts(G.level);
+  modeTimer = 0; modeIdx = 0;
+  globalMode = MODE_SCATTER;
+  frightenTimer = 0;
+  G.dead = false;
+  G.running = true;
+  player.invincible = 180;
+}
+
+function nextLevel() {
+  document.getElementById('overlay-level').classList.add('hidden');
+  G.level++;
+  G.ghostsCaught = 0;
+  G.closeCallTicks = 0;
+  beginLevel();
+}
+
+function showGameOver() {
+  G.running = false;
+  const funScore = calcFunScore();
+  document.getElementById('gameover-sub').textContent =
+    `Score: ${G.score}\nLevel: ${G.level}\nFun Score: ${funScore}/100\n\nGhost AI: ${getDiffLabel()}`;
+  document.getElementById('m-fun').textContent = funScore;
+  document.getElementById('overlay-gameover').classList.remove('hidden');
+  updateHighScores(G.score, G.level, funScore);
+}
+
+function resetGame() {
+  document.getElementById('overlay-gameover').classList.add('hidden');
+  G = makeInitialState();
+  beginLevel();
+}
+
+// ---- HIGH SCORES ----
+let highScores = [
+  {name:'NEXUS-7', score:18420, level:4},
+  {name:'PULSE-3', score:14200, level:3},
+  {name:'DRIFT-9', score:11800, level:3},
+  {name:'VEC-12',  score: 9400, level:2},
+  {name:'BASE-V0', score: 5000, level:1},
+];
+
+function updateHighScores(score, level, fun) {
+  highScores.push({name:'YOU', score, level});
+  highScores.sort((a,b) => b.score - a.score);
+  highScores = highScores.slice(0, 8);
+  renderHighScores();
+}
+
+function renderHighScores() {
+  const el = document.getElementById('hiscore-list');
+  el.innerHTML = '';
+  highScores.slice(0,6).forEach((h,i) => {
+    el.innerHTML += `
+      <div class="hiscore-entry">
+        <span class="hiscore-rank">${i+1}.</span>
+        <span class="hiscore-name">${h.name}</span>
+        <span class="hiscore-score">${h.score}</span>
+      </div>`;
+  });
+}
+
+// ---- CONTROLS ----
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  switch(e.key) {
+    case 'ArrowUp':    case 'w': case 'W': player.nextDir = {dr:-1,dc:0}; e.preventDefault(); break;
+    case 'ArrowDown':  case 's': case 'S': player.nextDir = {dr:1,dc:0};  e.preventDefault(); break;
+    case 'ArrowLeft':  case 'a': case 'A': player.nextDir = {dr:0,dc:-1}; e.preventDefault(); break;
+    case 'ArrowRight': case 'd': case 'D': player.nextDir = {dr:0,dc:1};  e.preventDefault(); break;
+    case 'p': case 'P':
+      if (!G.running) break;
+      G.paused = !G.paused;
+      document.getElementById('overlay-pause').classList.toggle('hidden', !G.paused);
+      break;
+    case 'r': case 'R':
+      if (G.running) resetGame();
+      break;
+  }
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// ---- UTILS ----
+function seededRng(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function shuffle(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(rng() * (i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function dist2(r1,c1,r2,c2) { return (r1-r2)**2 + (c1-c2)**2; }
+
+// ---- INIT ----
+renderHighScores();
+requestAnimationFrame(gameLoop);
+
+// Tempo counter (cosmetic)
+setInterval(() => {
+  const t = parseInt(document.getElementById('tempo-display').textContent);
+  const next = t > 0 ? t - 1 : 360;
+  document.getElementById('tempo-display').textContent = next;
+}, 200);
+</script>
+
+</body>
+</html>

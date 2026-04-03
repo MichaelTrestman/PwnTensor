@@ -1,0 +1,43 @@
+# PacTensor Frontend Architecture
+# Validators serve the game frontend — no separate infrastructure needed.
+
+frontend:
+  location: "frontend/index.html"
+  tech: "Single-file HTML + vanilla JS + Canvas2D"
+  aesthetic: "Dark retro-arcade, scanlines, glow effects, Press Start 2P font"
+
+  architecture:
+    validator_as_webserver: >
+      The validator is already running the sim and collecting tick-by-tick
+      episode logs. A sidecar FastAPI server serves the static frontend
+      and streams live match state over SSE/websocket. No separate infra.
+    multiple_validators: >
+      Multiple validators = multiple live game streams, load-distributed
+      naturally. Spectators watch real matches between real miners.
+
+  panels:
+    left:
+      - score_display
+      - lives_display
+      - level_display
+      - ghost_roster (name, color, current mode)
+      - ai_source (which miner's ghost AI is running)
+    right:
+      - subnet_status (miners, validators, tempo, emissions)
+      - session_metrics (deaths, pellets, time, caught, escaped, fun-score)
+      - top_miners_leaderboard
+      - controls_reference
+
+  live_streaming:
+    protocol: "SSE or WebSocket"
+    endpoint: "/stream/{episode_id}"
+    data: "Tick-by-tick game state updates"
+    spectator_mode: >
+      Spectators watch real matches between real miners competing for
+      TAO emissions. Not synthetic — the actual competition, live.
+
+  player_mode:
+    description: >
+      Players can also play directly against miner-powered ghosts.
+      Their session metrics (fun-score) get posted back to score
+      the miner whose ghost AI was running.

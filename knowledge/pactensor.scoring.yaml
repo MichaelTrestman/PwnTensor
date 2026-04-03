@@ -1,0 +1,50 @@
+# PacTensor Scoring / Incentive Mechanism
+# How ghost AI is scored and how miner weights are calculated.
+
+incentive_mechanism:
+  name: "Fun-Score IM"
+  goal: "Ghost AI that creates engaging, challenging-but-fair gameplay"
+  target_band: "50-75 out of 100"
+  penalty_zones:
+    too_easy: "fun_score < 40 — ghosts never threaten, boring"
+    too_hard: "fun_score > 85 — ghosts instantly kill, unfair"
+
+  fun_score_components:
+    danger:
+      description: "Close calls per second — ghost kept pressure on player"
+      formula: "min(close_call_ticks / elapsed_seconds * 10, 40)"
+      max_points: 40
+      close_call_threshold: "ghost within 1.2 cells of player"
+
+    efficiency:
+      description: "Pellets eaten per second — game pace was good"
+      formula: "min(pellets_eaten / elapsed_seconds * 5, 30)"
+      max_points: 30
+
+    survival:
+      description: "Player didn't die too much — ghost wasn't unfairly hard"
+      formula: "max(0, 30 - deaths * 10)"
+      max_points: 30
+
+    latency_penalty:
+      description: "Response time penalty for slow miners"
+      formula: "max(0, (avg_latency_ms - 150) / 150) * 0.2"
+
+  total: "danger + efficiency + survival - latency_penalty (normalized to [0, 1])"
+
+  weight_aggregation:
+    method: "rank_normalize"
+    description: >
+      Raw fun-scores are rank-normalized across all miners who played,
+      so one outlier can't tank the scale. Ranks map to [0, 1].
+      These become the weight vector submitted to set_weights().
+
+  anti_gaming:
+    seed_unpredictability: "Episode seeds derived from block_hash + validator_hotkey + tick"
+    varied_scenarios: "Validators randomize maze seeds and occasionally inject edge-case states"
+    determinism: "Same seed produces same maze — validators can verify each other"
+
+  difficulty_scaling:
+    ghost_speed: "Increases with level (1.4 + level * 0.18)"
+    frighten_duration: "Decreases with level (max(120, 360 - level * 30) frames)"
+    scatter_timing: "Fixed schedule but chase periods dominate at higher levels"

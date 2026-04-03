@@ -1,0 +1,72 @@
+# PacTensor Game Mechanics
+# The core game that PwnTensor subnet validators run and miners optimize ghost AI for.
+
+game:
+  name: PacTensor
+  type: pac-man variant with AI-controlled ghosts
+  branding_note: "Non-affiliated with Namco. All names changed — ghosts are VECTOR, NEXUS, PULSE, DRIFT"
+
+  grid:
+    cols: 21
+    rows: 23
+    cell_size_px: 20
+
+  maze:
+    generation: "Seeded recursive DFS, mirrored left-to-right for symmetry"
+    seed_derivation: "level * 7919 + 42 (deterministic per level)"
+    features:
+      - ghost_house: "Center of maze, 4 ghosts spawn inside, staggered release"
+      - tunnels: "Left/right edge wrap on middle row"
+      - power_pellets: "4 corners, trigger frightened mode"
+
+  player:
+    start_position: "row ROWS-3, center column"
+    speed: "1.5 + level * 0.1 pixels/frame (scales with level)"
+    lives: 3
+    invincibility_frames: 180 (after death)
+
+  ghosts:
+    count: 4
+    names: [VECTOR, NEXUS, PULSE, DRIFT]
+    colors: ["#ff4466", "#22ddff", "#ff9922", "#cc44ff"]
+    base_speed: "1.4 + level * 0.18 pixels/frame"
+    speed_variation: "ghost[i].speed = base * (0.9 + i*0.05)"
+
+    modes:
+      scatter: "Each ghost targets its assigned corner"
+      chase: "Each ghost uses its archetype strategy to pursue player"
+      frightened: "55% speed, run away from player, edible"
+      eaten: "180% speed, return to ghost house, then re-enter play"
+      home: "Waiting in ghost house, staggered release (i * 120 frames)"
+      leave: "Exiting ghost house toward door"
+
+    mode_schedule:
+      - { mode: scatter, duration: 420 }
+      - { mode: chase, duration: 1200 }
+      - { mode: scatter, duration: 300 }
+      - { mode: chase, duration: 1200 }
+      - { mode: scatter, duration: 240 }
+      - { mode: chase, duration: forever }
+
+    baseline_ai_archetypes:
+      VECTOR: "Direct BFS pathfinding to player position"
+      NEXUS: "Ambush — targets 4 cells ahead of player's current direction"
+      PULSE: "Flanking — direct pursuit when far, scatter when close"
+      DRIFT: "Random with intensity-based bias toward player"
+
+  miner_contract:
+    input: "GameStateSynapse with full game state"
+    output: "ghost_actions — list of {dr, dc} direction vectors, one per ghost"
+    latency_sla: "150ms per tick"
+    freedom: "Miners can use any technique — FSM, BFS, RL, LLM, behavior trees. Only output is scored."
+
+  state_schema:
+    player_pos: "[row, col] float position"
+    player_dir: "{dr, dc} current movement direction"
+    ghost_positions: "list of [row, col] per ghost"
+    ghost_modes: "list of mode strings per ghost"
+    maze_layout: "2D grid of tile types (WALL, DOT, POWER, EMPTY, TUNNEL, GHOST_HOME)"
+    pellets_remaining: int
+    power_pellet_active: bool
+    tick: int
+    level: int

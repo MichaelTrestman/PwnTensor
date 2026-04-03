@@ -1,0 +1,17 @@
+# PwnTensor Knowledge Index
+# Load subnet.invariants.yaml FIRST — always.
+# Then use this index to route to the right file.
+
+files:
+  # Core constraints (load first)
+  - subnet.invariants.yaml: "Non-negotiable rules for any Bittensor subnet"
+
+  # PwnTensor-specific
+  - pactensor.game.yaml: "PacTensor game mechanics, state schema, ghost AI contract"
+  - pactensor.scoring.yaml: "Fun-score incentive mechanism, weight calculation"
+  - pactensor.frontend.yaml: "Frontend architecture, SSE streaming, validator-as-webserver"
+
+  # General Bittensor (inherited from Chi)
+  - design_flow.yaml: "How to select an IM pattern for your subnet"
+  - validator.contract.yaml: "What a validator must do"
+  - miner.contract.yaml: "What a miner must do"
