@@ -7,7 +7,7 @@ Each game on the subnet maps to a Bittensor incentive mechanism. The validator:
      axons, collects actions, steps the sim, scores episodes
   3. Sets weights per mechanism (each game's rank-normalized scores go to its
      own mechanism's set_weights call)
-  4. Serves the frontend (live match spectating + playable PacTensor)
+  4. Serves the frontend (live match spectating for all games: PacTensor, Melee Light, KAZ)
 """
 
 import os

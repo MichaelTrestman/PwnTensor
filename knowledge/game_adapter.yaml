@@ -31,7 +31,7 @@ adapter_contract:
   adapter_types:
     builtin:
       description: "Python module in the validator's sim/ directory"
-      example: "sim.pactensor, sim.mortal_kombat, sim.halo"
+      example: "sim.pactensor, sim.meleelight, sim.kaz"
       when: "Demo games, games with simple sims"
 
     docker:

@@ -19,7 +19,10 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip uv
 
 # Copy application code
-COPY . .
+COPY validator.py protocol.py reward.py game_registry.py ./
+
+# Copy frontend files
+COPY frontend/ ./frontend/
 
 # Install dependencies
 RUN uv pip install --system --no-cache -e .
@@ -34,10 +37,6 @@ ENV NETUID=1
 ENV WALLET_NAME=validator
 ENV HOTKEY_NAME=default
 ENV LOG_LEVEL=INFO
-ENV FRONTEND_PORT=8080
-
-# Expose frontend port
-EXPOSE 8080
 
 # Run the validator
 CMD ["python", "validator.py"]

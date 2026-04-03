@@ -1,13 +1,15 @@
 # PwnTensor: Game AI Marketplace on Bittensor
 
-A subnet where game studios bring their games and miners compete to build the best AI agents. Each game maps to a Bittensor incentive mechanism with its own weight matrix, bond pool, and independent emissions.
+A Bittensor subnet designed to beat you at video games.
+
+Game developers can bring their games to have miners compete to build the best AI agents to challegne players. Each game has its own incentive mechanism with its own weight matrix, bond pool, and emissions.
 
 ## The Concept
 
-- **Game studios** register games on the subnet (each game = one incentive mechanism)
+- **Game developers** register games on the subnet (each game = one incentive mechanism)
 - **Miners** receive game state, return actions. Any technique: FSM, RL, LLM, behavior trees. Only outputs are scored.
 - **Validators** run headless game sims, fan out state to miner axons, score episodes, set weights per mechanism. Also serve playable frontends for all games.
-- **Stakers** back validators; game studios stake TAO into their game's mechanism to attract miner attention (market-driven prioritization).
+- **Stakers** back validators; game developers stake TAO into their game's mechanism to attract miner attention (market-driven prioritization).
 
 ## Demo Games
 

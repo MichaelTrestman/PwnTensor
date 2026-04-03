@@ -1,19 +1,19 @@
 # PwnTensor Subnet Docker Compose
 #
-# For Validators: Use this file to run the validator with auto-updates
+# For Validators: Use this file to run the validator + frontend locally
 #
 # Usage:
-#   1. Copy this file to your server
-#   2. Update NETUID and wallet configuration
-#   3. Run: docker-compose up -d
-#   4. View logs: docker-compose logs -f validator
+#   1. Copy env.example to .env and update values
+#   2. Run: docker-compose up -d
+#   3. View logs: docker-compose logs -f validator
+#   4. Play games: http://localhost:8080 (PacTensor), /melee/ (Melee Light), /kaz/ (KAZ)
 #
-# Watchtower will automatically update the validator when new images are pushed
+# Watchtower auto-updates when new images are pushed to GHCR
 
 services:
   validator:
-    # For production: use the Docker Hub image
-    # image: your-dockerhub-username/pwntensor:latest
+    # For production: use GHCR image
+    # image: ghcr.io/your-org/pwntensor:latest
 
     # For development: build locally
     build: .
@@ -21,36 +21,20 @@ services:
     container_name: pwntensor-validator
     restart: unless-stopped
 
-    # Load environment variables from .env file
     env_file:
       - .env
 
     environment:
-      # Network configuration
       - NETWORK=${NETWORK:-finney}
       - NETUID=${NETUID:-1}
-
-      # Wallet configuration (keys are mounted as volume)
       - WALLET_NAME=${WALLET_NAME:-default}
       - HOTKEY_NAME=${HOTKEY_NAME:-default}
-
-      # Logging
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
-      # Frontend
-      - FRONTEND_PORT=${FRONTEND_PORT:-8080}
-
     volumes:
-      # Mount wallet directory (read-only for security)
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-
-      # Persistent storage for validator state/scores
       - validator-data:/app/data
 
-    ports:
-      - "${FRONTEND_PORT:-8080}:8080"
-
-    # Resource limits - adjust based on your hardware
     deploy:
       resources:
         limits:
@@ -58,7 +42,6 @@ services:
         reservations:
           memory: 2G
 
-    # Health check
     healthcheck:
       test: ["CMD", "python", "-c", "import bittensor; print('healthy')"]
       interval: 30s
@@ -66,18 +49,54 @@ services:
       retries: 3
       start_period: 60s
 
-    # Logging configuration
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "5"
 
-    # Labels for Watchtower
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # Watchtower - automatically updates containers when new images are available
+  # Frontend — nginx serving all three game UIs
+  frontend:
+    image: nginx:alpine
+    container_name: pwntensor-frontend
+    restart: unless-stopped
+
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./deploy/base/nginx-configmap.yaml:/tmp/nginx-src:ro
+
+    # Inline nginx config since configmap is k8s-only
+    command: >
+      sh -c "echo 'server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        location / { try_files $$uri $$uri/ /index.html; }
+        location /melee/ { alias /usr/share/nginx/html/meleelight/; try_files $$uri $$uri/ /meleelight/index.html; }
+        location /kaz/ { alias /usr/share/nginx/html/kaz/; try_files $$uri $$uri/ /kaz/index.html; }
+        location /healthz { return 200 ok; add_header Content-Type text/plain; }
+      }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Watchtower — auto-updates containers when new images are pushed
   watchtower:
     image: containrrr/watchtower:latest
     container_name: watchtower

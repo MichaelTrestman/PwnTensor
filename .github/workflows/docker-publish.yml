@@ -16,9 +16,11 @@ on:
       - 'validator.py'
       - 'protocol.py'
       - 'reward.py'
+      - 'game_registry.py'
       - 'frontend/**'
       - 'pyproject.toml'
       - 'Dockerfile'
+      - 'deploy/**'
       - '.github/workflows/docker-publish.yml'
 
   workflow_dispatch:
