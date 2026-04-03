@@ -3,18 +3,18 @@ You are working in this repository.
 # All Bittensor subnet knowledge is in @knowledge/
 # Start with @knowledge/INDEX.yaml for task routing
 
-# PwnTensor-specific context:
-# - This is a game AI subnet where miners compete to build ghost AI for PacTensor
-# - Validators run headless game sims and serve the frontend
-# - The scoring function rewards "fun" ghost AI (challenging but fair)
-# - protocol.py defines GameStateSynapse (validator->miner game state, miner->validator ghost actions)
-# - reward.py defines the fun-score calculation and rank normalization
-# - frontend/index.html is the playable PacTensor game
+# PwnTensor = Game AI Marketplace on Bittensor
+# - Game studios bring games. Each game = one Bittensor incentive mechanism.
+# - Miners compete to build the best AI agents for each game.
+# - Validators run headless sims, score miners per mechanism, serve frontend.
+# - protocol.py: GameStateSynapse — universal across all games (game_id routes logic)
+# - reward.py: per-game scoring functions + rank normalization
+# - game_registry.py: active games and their mechanism mappings
+# - frontend/index.html: PacTensor (demo game, mechanism 0)
 
 # Quick reference:
 # - ALWAYS load subnet.invariants.yaml first (non-negotiable rules)
-# - Use design_flow.yaml to select mechanism pattern
-# - Pattern files: compute_auction, capacity_market, data_indexing,
-#   prediction_market, time_series_forecasting, external_activity_verification,
-#   adversarial_red_blue, container_execution
+# - pwntensor.architecture.yaml for the multi-game/multi-mechanism design
+# - game_adapter.yaml for the game registration contract
+# - pactensor.*.yaml for PacTensor-specific details
 

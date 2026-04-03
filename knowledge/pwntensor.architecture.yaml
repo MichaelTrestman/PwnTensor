@@ -1,0 +1,81 @@
+# PwnTensor Architecture — Game AI Marketplace on Bittensor
+#
+# The subnet is a continuous AI performance tournament. The commodity
+# produced is game AI behavior. Game studios are customers.
+
+concept:
+  one_line: "Game studios bring games. Miners compete to build the best AI agents. Each game = one Bittensor incentive mechanism."
+
+  roles:
+    miners: >
+      Bot/agent developers. Register a hotkey, run an axon that receives
+      game state and returns actions. Implementation-agnostic: FSM, BFS,
+      RL policy, LLM, behavior trees — subnet only scores outputs.
+    validators: >
+      Game environment runners. Spin up headless sims, fan out
+      GameStateSynapse to miner axons, step the sim, score results,
+      set weights per mechanism. Also serve the public frontend.
+    game_studios: >
+      Customers. Register a game as a mechanism on the subnet.
+      Provide: game adapter (Docker image or API endpoint), scoring
+      function, context schema. Stake TAO to prioritize their game.
+
+  multi_mechanism_mapping:
+    description: >
+      Each game maps to a Bittensor incentive mechanism. Each mechanism
+      has its own weight matrix, bond pool, and independent emissions.
+      Validators set weights separately per mechanism. Miners get
+      scored independently per game — performance in PacTensor doesn't
+      affect their Halo rating.
+    reference: "developer-docs/docs/subnets/understanding-multiple-mech-subnets.md"
+    current_limit: "2 mechanisms per subnet (will be raised)"
+    emission_split: >
+      Subnet creator controls what % of emissions goes to each mechanism
+      via sudo_set_mechanism_emission_split extrinsic.
+
+  miner_contract:
+    input: "GameStateSynapse — game_id, episode_seed, tick, state dict, valid_actions"
+    output: "action string + action_args dict"
+    latency_sla: "150ms per tick (game-specific, configurable)"
+    key_insight: >
+      Miners that handle multiple games get scoring opportunities across
+      multiple mechanisms. A generalist agent (LLM + game context) can
+      pick up the long tail. A specialist (scripted bot for one game)
+      can dominate that game's mechanism.
+
+  validator_loop:
+    pseudocode: |
+      each tempo (360 blocks):
+        for each mechanism:
+          for each game in mechanism:
+            seed episode from block_hash + validator_hotkey + tick
+            run headless sim via game adapter
+            fan out GameStateSynapse to all miner axons per tick
+            collect action responses
+            step sim, record episode log
+            score with game-specific scorer
+          rank_normalize scores across miners
+          set_weights(mechanism_id=mech_idx, uids, weights)
+
+  anti_gaming:
+    seed_derivation: "block_hash + validator_hotkey + tick — unpredictable to miners"
+    randomized_scenarios: "Validators randomize episode seeds, inject edge-case states"
+    determinism: "Same seed = same maze/map — validators can cross-verify"
+
+  demo_games:
+    mechanism_0: "PacTensor — Pac-Man variant, miner = ghost AI"
+    mechanism_1: "Mortal Kombat (1v1 fighter) and Halo (arena combat)"
+    note: >
+      PacTensor is the demo. MK and Halo are planned. Once the mechanism
+      cap is raised above 2, each game gets its own mechanism.
+
+  game_registration:
+    required:
+      - game_adapter: "Docker image or API endpoint validators call to run episodes"
+      - scoring_function: "Game-specific config, maps to a scorer in reward.py"
+      - context_schema: "What state fields exist in this game"
+      - mechanism_index: "Which Bittensor mechanism this game maps to"
+    monetization: >
+      Game studios that want better AI stake more TAO into their game's
+      mechanism, which raises the reward signal for miners who perform
+      well on their game. Market-driven prioritization.

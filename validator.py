@@ -1,11 +1,13 @@
 """
 PwnTensor subnet validator.
 
-Runs headless PacTensor game simulations, fans out game state to miner axons
-via GameStateSynapse, collects ghost AI responses, scores episodes on the
-"fun score" metric, and sets weights on chain every tempo.
-
-Also serves the PacTensor frontend on a configurable port.
+Each game on the subnet maps to a Bittensor incentive mechanism. The validator:
+  1. Pulls the game registry (which games are active, which mechanism each maps to)
+  2. For each game: runs headless sim episodes, fans out GameStateSynapse to miner
+     axons, collects actions, steps the sim, scores episodes
+  3. Sets weights per mechanism (each game's rank-normalized scores go to its
+     own mechanism's set_weights call)
+  4. Serves the frontend (live match spectating + playable PacTensor)
 """
 
 import os
@@ -14,9 +16,9 @@ import click
 import logging
 import threading
 import sys
-import numpy as np
 import bittensor as bt
 from bittensor_wallet import Wallet
+from game_registry import get_game_registry, get_games_by_mechanism
 from reward import score_episode, rank_normalize
 
 logging.basicConfig(
@@ -79,16 +81,13 @@ def main(network: str, netuid: int, coldkey: str, hotkey: str, log_level: str):
     heartbeat_thread.start()
 
     try:
-        # Initialize wallet, subtensor, and metagraph
         wallet = Wallet(name=coldkey, hotkey=hotkey)
         subtensor = bt.Subtensor(network=network)
         metagraph = bt.Metagraph(netuid=netuid, network=network)
 
-        # Sync metagraph
         metagraph.sync(subtensor=subtensor)
         logger.info(f"Metagraph synced: {metagraph.n} neurons at block {metagraph.block}")
 
-        # Get our UID
         my_hotkey = wallet.hotkey.ss58_address
         if my_hotkey not in metagraph.hotkeys:
             logger.error(f"Hotkey {my_hotkey} not registered on netuid {netuid}")
@@ -97,9 +96,17 @@ def main(network: str, netuid: int, coldkey: str, hotkey: str, log_level: str):
         my_uid = metagraph.hotkeys.index(my_hotkey)
         logger.info(f"Validator UID: {my_uid}")
 
-        # Get tempo for this subnet
         tempo = subtensor.get_subnet_hyperparameters(netuid).tempo
         logger.info(f"Subnet tempo: {tempo} blocks")
+
+        # Load game registry — each game maps to a mechanism index
+        games = get_game_registry()
+        mechanism_indices = sorted(set(g.mechanism_index for g in games))
+        logger.info(
+            f"Game registry: {len(games)} games across mechanisms {mechanism_indices}"
+        )
+        for g in games:
+            logger.info(f"  [{g.mechanism_index}] {g.game_id}: {g.name}")
 
         last_weight_block = 0
 
@@ -112,35 +119,52 @@ def main(network: str, netuid: int, coldkey: str, hotkey: str, log_level: str):
 
                 blocks_since_last = current_block - last_weight_block
                 if blocks_since_last >= tempo:
-                    logger.info(f"Block {current_block}: Setting weights (tempo={tempo})")
+                    logger.info(f"Block {current_block}: Running episodes and setting weights")
 
-                    # TODO: Run headless PacTensor episodes against each miner's axon.
-                    # For each miner:
-                    #   1. Generate episode seed from block_hash + validator_hotkey + tick
-                    #   2. Fan out GameStateSynapse with game state each tick
-                    #   3. Collect ghost_actions from miner
-                    #   4. Step simulation, record episode_log
-                    #   5. Score with reward.score_episode()
-                    #
-                    # For now: baseline burn-to-UID-0 (same as Chi template)
+                    # For each mechanism, run episodes for its games and set weights
+                    for mech_idx in mechanism_indices:
+                        mech_games = get_games_by_mechanism(mech_idx)
+                        logger.info(
+                            f"Mechanism {mech_idx}: "
+                            f"{[g.game_id for g in mech_games]}"
+                        )
 
-                    uids = [0]
-                    weights = [1.0]
+                        # TODO: For each game in this mechanism:
+                        #   1. Derive episode seed: hash(block_hash + my_hotkey + tick)
+                        #   2. Initialize headless sim via game adapter
+                        #   3. For each tick in the episode:
+                        #      a. Build GameStateSynapse with current state
+                        #      b. Fan out to all miner axons via dendrite
+                        #      c. Collect action responses
+                        #      d. Step the sim with each miner's action
+                        #   4. Score each miner's episode with score_episode(game_id, log)
+                        #   5. Rank-normalize scores across miners
+                        #   6. Set weights for this mechanism:
+                        #      subtensor.set_weights(
+                        #          wallet=wallet, netuid=netuid,
+                        #          uids=uids, weights=weights,
+                        #          mechanism_id=mech_idx,
+                        #      )
 
-                    success = subtensor.set_weights(
-                        wallet=wallet,
-                        netuid=netuid,
-                        uids=uids,
-                        weights=weights,
-                        wait_for_inclusion=True,
-                        wait_for_finalization=False,
-                    )
+                        # Placeholder: burn to UID 0 per mechanism
+                        uids = [0]
+                        weights = [1.0]
 
-                    if success:
-                        logger.info(f"Successfully set weights for {len(uids)} neurons")
-                        last_weight_block = current_block
-                    else:
-                        logger.warning("Failed to set weights")
+                        success = subtensor.set_weights(
+                            wallet=wallet,
+                            netuid=netuid,
+                            uids=uids,
+                            weights=weights,
+                            wait_for_inclusion=True,
+                            wait_for_finalization=False,
+                        )
+
+                        if success:
+                            logger.info(f"  Mechanism {mech_idx}: weights set")
+                        else:
+                            logger.warning(f"  Mechanism {mech_idx}: failed to set weights")
+
+                    last_weight_block = current_block
                 else:
                     logger.debug(
                         f"Block {current_block}: Waiting for tempo "

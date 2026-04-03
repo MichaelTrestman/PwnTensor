@@ -1,8 +1,9 @@
 """
 PwnTensor subnet protocol — Synapse definitions for game AI communication.
 
-Validators send GameStateSynapse with the current game state.
-Miners return the ghost action decisions.
+One synapse type for all games. game_id routes the miner's internal logic.
+Miners that can handle multiple games get scoring opportunities across
+multiple incentive mechanisms.
 """
 
 import bittensor as bt
@@ -11,20 +12,24 @@ from typing import Optional
 
 class GameStateSynapse(bt.Synapse):
     """
-    Synapse for game AI communication between validators and miners.
+    Universal game AI synapse — works across all registered games.
 
-    Validators set the immutable fields (game state).
-    Miners fill the mutable response field (ghost actions).
+    Validators set the immutable fields (game identity + state snapshot).
+    Miners fill the mutable response fields (chosen action).
+
+    The state dict is game-specific — each game defines its own schema
+    (see knowledge/game_adapter.yaml for the adapter contract).
     """
 
     # ---- Set by validator (immutable) ----
-    game_id: str                          # "pactensor" (extensible to future games)
-    episode_seed: int                     # deterministic RNG seed for the match
-    tick: int                             # current sim step
-    state: dict                           # full game state snapshot
-    valid_actions: list[str]              # legal ghost moves for this tick
-    ghost_count: int = 4                  # number of ghosts needing actions
+    game_id: str                          # e.g. "pactensor", "halo", "mortal_kombat"
+    episode_seed: int                     # deterministic RNG seed (block_hash + vali_hotkey + tick)
+    tick: int                             # current sim step within the episode
+    state: dict                           # full game state snapshot (game-specific schema)
+    valid_actions: list[str]              # legal moves for this tick
+    context_window: Optional[list[dict]] = None  # last N ticks for stateless miners
 
     # ---- Filled by miner (mutable) ----
-    ghost_actions: Optional[list[dict]] = None  # [{dir: {dr, dc}} per ghost]
-    latency_budget_ms: int = 150                # hard SLA per tick
+    action: Optional[str] = None          # chosen action string
+    action_args: Optional[dict] = None    # action parameters, e.g. {"target": [x,y], "move": "up"}
+    latency_budget_ms: int = 150          # hard SLA per tick

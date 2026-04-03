@@ -1,0 +1,92 @@
+# Game Adapter Contract
+# How game studios register games on the PwnTensor subnet.
+
+adapter_contract:
+  description: >
+    Each game on the subnet needs an adapter that validators can run
+    to execute headless episodes. The adapter handles sim initialization,
+    state extraction, action application, and episode termination.
+
+  interface:
+    init_episode:
+      input: "episode_seed (int)"
+      output: "initial game state (dict)"
+      notes: "Deterministic — same seed always produces same initial state"
+
+    get_state:
+      input: "none (reads internal sim state)"
+      output: "state dict conforming to game's context schema"
+
+    apply_action:
+      input: "action (str), action_args (dict)"
+      output: "updated state dict"
+      notes: "Steps the sim one tick with the miner's chosen action"
+
+    is_episode_done:
+      output: "bool"
+
+    get_episode_log:
+      output: "dict with all metrics needed by the game's scoring function"
+
+  adapter_types:
+    builtin:
+      description: "Python module in the validator's sim/ directory"
+      example: "sim.pactensor, sim.mortal_kombat, sim.halo"
+      when: "Demo games, games with simple sims"
+
+    docker:
+      description: "Docker image that exposes the adapter interface over HTTP"
+      example: "ghcr.io/studio/their-game-adapter:latest"
+      when: "Complex game engines, proprietary sims"
+      notes: >
+        Validator pulls and runs the Docker image locally. The game studio
+        maintains the image. This is the production path for onboarding
+        arbitrary games.
+
+    api:
+      description: "External API endpoint the validator calls"
+      example: "https://api.gamestudio.com/sim/v1"
+      when: "Studio wants to run their own sim infrastructure"
+      notes: >
+        Introduces validator variance risk — network latency affects scores.
+        Prefer Docker adapters for determinism.
+
+  per_game_state_schemas:
+    pactensor:
+      pacman_pos: "[x, y]"
+      ghost_positions: "[[x,y], ...]"
+      ghost_modes: "[chase|scatter|frightened|eaten]"
+      ghost_boost_multiplier: "float"
+      pellets_remaining: "int"
+      power_pellet_active: "bool"
+      maze_layout: "run-length encoded grid"
+      tick: "int"
+
+    mortal_kombat:
+      p1_health: "int"
+      p2_health: "int"
+      p1_pos: "float (0-1 normalized)"
+      p2_pos: "float (0-1 normalized)"
+      p1_state: "string (blocking, jumping, etc)"
+      p2_state: "string"
+      frame: "int"
+      move_history_p1: "[str]"
+      move_history_p2: "[str]"
+
+    halo:
+      agent_pos: "[x,y,z]"
+      agent_health: "int"
+      agent_shield: "int"
+      enemies: "[{id, pos, health, weapon}]"
+      pickups: "[{type, pos}]"
+      map_id: "string"
+      ammo: "{weapon: count}"
+
+  scoring_dimensions:
+    universal:
+      - latency: "Response under timeout gets full credit; degrades linearly after"
+    per_game:
+      - behavioral_correctness: "Did the NPC achieve its objective?"
+      - naturalness: "Human rater panel or LLM judge for believability"
+      - consistency: "Coherent behavior across a 30-tick episode"
+      - adversarial_robustness: "Does it break on weird state?"

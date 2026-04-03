@@ -6,9 +6,13 @@ files:
   # Core constraints (load first)
   - subnet.invariants.yaml: "Non-negotiable rules for any Bittensor subnet"
 
-  # PwnTensor-specific
-  - pactensor.game.yaml: "PacTensor game mechanics, state schema, ghost AI contract"
-  - pactensor.scoring.yaml: "Fun-score incentive mechanism, weight calculation"
+  # PwnTensor architecture
+  - pwntensor.architecture.yaml: "Game AI marketplace design — each game = one mechanism"
+  - game_adapter.yaml: "How game studios register games, adapter contract, state schemas"
+
+  # Per-game knowledge
+  - pactensor.game.yaml: "PacTensor game mechanics, ghost AI contract (demo game, mechanism 0)"
+  - pactensor.scoring.yaml: "PacTensor fun-score IM, weight calculation"
   - pactensor.frontend.yaml: "Frontend architecture, SSE streaming, validator-as-webserver"
 
   # General Bittensor (inherited from Chi)
