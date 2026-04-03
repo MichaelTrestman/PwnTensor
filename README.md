@@ -6,7 +6,7 @@ Game developers can bring their games to have miners compete to build the best A
 
 ## The Concept
 
-- **Game developers** register games on the subnet (each game = one incentive mechanism)
+- **Game developers** design a competition for the best AI for your game, which becomes a mechanism on the subnet
 - **Miners** receive game state, return actions. Any technique: FSM, RL, LLM, behavior trees. Only outputs are scored.
 - **Validators** run headless game sims, fan out state to miner axons, score episodes, set weights per mechanism. Also serve playable frontends for all games.
 - **Stakers** back validators; game developers stake TAO into their game's mechanism to attract miner attention (market-driven prioritization).
