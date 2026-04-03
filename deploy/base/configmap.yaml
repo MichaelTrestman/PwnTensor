@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pwntensor-config
+  namespace: pwntensor
+data:
+  NETWORK: "finney"
+  NETUID: "1"
+  LOG_LEVEL: "INFO"
+  FRONTEND_PORT: "8080"

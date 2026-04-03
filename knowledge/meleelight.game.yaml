@@ -1,0 +1,65 @@
+# Melee Light — Platform Fighter (Mechanism 1)
+# Source: https://github.com/schmooblidon/meleelight (MIT license)
+# Smash Bros Melee-style platform fighter with 5 characters.
+
+game:
+  name: Melee Light
+  game_id: meleelight
+  mechanism_index: 1
+  type: platform fighter (Smash Bros Melee clone)
+  source: "github.com/schmooblidon/meleelight"
+  license: MIT
+  language: JavaScript
+  stars: 402
+
+  characters:
+    - Fox
+    - Falco
+    - Captain Falcon
+    - Marth
+    - Jigglypuff
+
+  mechanics:
+    stocks: "Each player starts with N stocks (lives). Lose a stock when knocked off stage."
+    percent: "Damage accumulates as percent. Higher percent = further knockback."
+    knockback: "Attacks send opponent flying. Distance scales with percent."
+    recovery: "Players can use moves to return to stage after being knocked off."
+    action_states: "Each character has distinct animation states (idle, dash, jump, attack, etc.)"
+
+  headless_feasibility:
+    game_loop: "gameTick() handles all logic, renderTick() handles drawing — cleanly separated"
+    ai_system: "Built-in ai.js with runAI() that injects inputs via aiInputBank"
+    state_access: "player[i].phys.pos, player[i].actionState, player[i].percent, player[i].stocks"
+    replay_system: "saveGameState/loadReplay — state is already serializable"
+    headless_path: "Strip Canvas rendering, run game loop in Node.js, inject inputs programmatically"
+
+  miner_contract:
+    role: "Control one fighter (p2) against a reference opponent (p1)"
+    input: "Game state with both players' positions, percents, stocks, action states, facing"
+    output: "Controller input: {stick_x, stick_y, a, b, z, l, r} per frame"
+    latency_sla: "150ms per frame"
+
+  state_schema:
+    p1_pos: "{x, y} float position"
+    p2_pos: "{x, y} float position"
+    p1_percent: "int (damage accumulated)"
+    p2_percent: "int (damage accumulated)"
+    p1_stocks: "int (lives remaining)"
+    p2_stocks: "int (lives remaining)"
+    p1_action_state: "string (current animation state)"
+    p2_action_state: "string"
+    p1_facing: "int (-1 or 1)"
+    p2_facing: "int (-1 or 1)"
+    stage_id: "string"
+    frame: "int"
+
+  scoring:
+    primary: "Stock differential (stocks_remaining - opponent_stocks)"
+    secondary: "Damage differential (damage_dealt - damage_taken)"
+    weights: "70% stock outcome, 30% damage efficiency"
+    normalization: "rank-based across all miners"
+
+  frontend:
+    type: "Canvas-based browser game (already a web game upstream)"
+    integration: "Clone upstream, mod to accept AI-controlled opponent from miner via SSE/WebSocket"
+    aesthetic: "Rebrand to match PwnTensor dark retro style"

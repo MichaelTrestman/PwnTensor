@@ -11,9 +11,11 @@ files:
   - game_adapter.yaml: "How game studios register games, adapter contract, state schemas"
 
   # Per-game knowledge
-  - pactensor.game.yaml: "PacTensor game mechanics, ghost AI contract (demo game, mechanism 0)"
+  - pactensor.game.yaml: "PacTensor game mechanics, ghost AI contract (mechanism 0)"
   - pactensor.scoring.yaml: "PacTensor fun-score IM, weight calculation"
-  - pactensor.frontend.yaml: "Frontend architecture, SSE streaming, validator-as-webserver"
+  - pactensor.frontend.yaml: "PacTensor frontend architecture"
+  - meleelight.game.yaml: "Melee Light platform fighter mechanics, state schema (mechanism 1)"
+  - kaz.game.yaml: "Knights Archers Zombies co-op mechanics, observation/action spaces (mechanism 2)"
 
   # General Bittensor (inherited from Chi)
   - design_flow.yaml: "How to select an IM pattern for your subnet"

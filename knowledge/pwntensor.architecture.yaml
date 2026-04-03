@@ -26,7 +26,7 @@ concept:
       has its own weight matrix, bond pool, and independent emissions.
       Validators set weights separately per mechanism. Miners get
       scored independently per game — performance in PacTensor doesn't
-      affect their Halo rating.
+      affect their Melee Light or KAZ rating.
     reference: "developer-docs/docs/subnets/understanding-multiple-mech-subnets.md"
     current_limit: "2 mechanisms per subnet (will be raised)"
     emission_split: >
@@ -63,11 +63,12 @@ concept:
     determinism: "Same seed = same maze/map — validators can cross-verify"
 
   demo_games:
-    mechanism_0: "PacTensor — Pac-Man variant, miner = ghost AI"
-    mechanism_1: "Mortal Kombat (1v1 fighter) and Halo (arena combat)"
+    mechanism_0: "PacTensor — Pac-Man variant, miner = ghost AI (custom, frontend/index.html)"
+    mechanism_1: "Melee Light — Smash Bros-style platform fighter (MIT, github.com/schmooblidon/meleelight)"
+    mechanism_2: "Knights Archers Zombies — co-op survival (MIT, Farama PettingZoo butterfly)"
     note: >
-      PacTensor is the demo. MK and Halo are planned. Once the mechanism
-      cap is raised above 2, each game gets its own mechanism.
+      All three are open source. Each gets its own mechanism and its own
+      browser-playable frontend served by validators.
 
   game_registration:
     required:

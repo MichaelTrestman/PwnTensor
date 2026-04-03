@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pwntensor-config
+  namespace: pwntensor
+data:
+  # Local dev: hit local subtensor or testnet
+  NETWORK: "local"
+  NETUID: "1"
+  LOG_LEVEL: "DEBUG"
+  FRONTEND_PORT: "8080"

@@ -6,28 +6,31 @@ A subnet where game studios bring their games and miners compete to build the be
 
 - **Game studios** register games on the subnet (each game = one incentive mechanism)
 - **Miners** receive game state, return actions. Any technique: FSM, RL, LLM, behavior trees. Only outputs are scored.
-- **Validators** run headless game sims, fan out state to miner axons, score episodes, set weights per mechanism. Also serve the live frontend.
+- **Validators** run headless game sims, fan out state to miner axons, score episodes, set weights per mechanism. Also serve playable frontends for all games.
 - **Stakers** back validators; game studios stake TAO into their game's mechanism to attract miner attention (market-driven prioritization).
 
 ## Demo Games
 
-| Game | Mechanism | Miner Role | Scoring |
-|------|-----------|------------|---------|
-| PacTensor | 0 | Ghost AI | Fun-score: challenging but fair (target 50-75/100) |
-| Mortal Kombat | 1 | Fighter p2 | Normalized damage dealt minus taken |
-| Halo Arena | 1 | Agent | Kills - deaths + survival bonus |
+| Mechanism | Game | Source | Miner Role | Scoring |
+|-----------|------|--------|------------|---------|
+| 0 | **PacTensor** | Custom | Ghost AI | Fun-score: challenging but fair (target 50-75/100) |
+| 1 | **Melee Light** | [schmooblidon/meleelight](https://github.com/schmooblidon/meleelight) (MIT) | Platform fighter vs reference opponent | Stocks remaining + damage differential |
+| 2 | **Knights Archers Zombies** | [Farama PettingZoo](https://github.com/Farama-Foundation/PettingZoo) (MIT) | Co-op agent vs zombie waves | Waves survived + kills + team survival |
 
-PacTensor ships with a playable frontend. MK and Halo sims are planned.
+All three games have browser-playable frontends served by validators.
 
 ## Structure
 
 ```
-validator.py      — main loop: per-mechanism episode running + weight setting
-protocol.py       — GameStateSynapse: universal across all games
-reward.py         — per-game scoring functions + rank normalization
-game_registry.py  — active games and their mechanism mappings
-frontend/         — PacTensor web game (served by validators)
-knowledge/        — Chi-compatible knowledge files for vibe-coding agents
+validator.py      -- main loop: per-mechanism episode running + weight setting
+protocol.py       -- GameStateSynapse: universal across all games
+reward.py         -- per-game scoring functions + rank normalization
+game_registry.py  -- active games and their mechanism mappings
+frontend/         -- browser-playable frontends for all games
+  index.html      -- PacTensor
+  meleelight/     -- Melee Light platform fighter
+  kaz/            -- Knights Archers Zombies co-op
+knowledge/        -- Chi-compatible knowledge files for vibe-coding agents
 ```
 
 ## Quick Start

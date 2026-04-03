@@ -62,25 +62,31 @@ adapter_contract:
       maze_layout: "run-length encoded grid"
       tick: "int"
 
-    mortal_kombat:
-      p1_health: "int"
-      p2_health: "int"
-      p1_pos: "float (0-1 normalized)"
-      p2_pos: "float (0-1 normalized)"
-      p1_state: "string (blocking, jumping, etc)"
-      p2_state: "string"
+    meleelight:
+      p1_pos: "{x, y} float position"
+      p2_pos: "{x, y} float position"
+      p1_percent: "int (damage accumulated)"
+      p2_percent: "int (damage accumulated)"
+      p1_stocks: "int (lives remaining)"
+      p2_stocks: "int (lives remaining)"
+      p1_action_state: "string (idle, dash, jump, attack, etc)"
+      p2_action_state: "string"
+      p1_facing: "int (-1 or 1)"
+      p2_facing: "int (-1 or 1)"
+      stage_id: "string"
       frame: "int"
-      move_history_p1: "[str]"
-      move_history_p2: "[str]"
 
-    halo:
-      agent_pos: "[x,y,z]"
+    kaz:
+      agent_id: "string (knight_0, knight_1, archer_0, archer_1)"
+      agent_pos: "{x, y} float position"
       agent_health: "int"
-      agent_shield: "int"
-      enemies: "[{id, pos, health, weapon}]"
-      pickups: "[{type, pos}]"
-      map_id: "string"
-      ammo: "{weapon: count}"
+      agent_type: "string (knight|archer)"
+      nearby_zombies: "[{pos, health, distance}]"
+      nearby_allies: "[{id, pos, health, type}]"
+      arrows_in_flight: "[{pos, velocity}]"
+      wave: "int"
+      zombies_remaining: "int"
+      tick: "int"
 
   scoring_dimensions:
     universal:

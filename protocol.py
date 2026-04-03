@@ -22,7 +22,7 @@ class GameStateSynapse(bt.Synapse):
     """
 
     # ---- Set by validator (immutable) ----
-    game_id: str                          # e.g. "pactensor", "halo", "mortal_kombat"
+    game_id: str                          # e.g. "pactensor", "meleelight", "kaz"
     episode_seed: int                     # deterministic RNG seed (block_hash + vali_hotkey + tick)
     tick: int                             # current sim step within the episode
     state: dict                           # full game state snapshot (game-specific schema)

@@ -1,0 +1,87 @@
+# Knights Archers Zombies (KAZ) — Co-op Survival (Mechanism 2)
+# Source: Farama PettingZoo butterfly/knights_archers_zombies (MIT license)
+# https://github.com/Farama-Foundation/PettingZoo
+
+game:
+  name: Knights Archers Zombies
+  game_id: kaz
+  mechanism_index: 2
+  type: cooperative survival (top-down 2D)
+  source: "Farama-Foundation/PettingZoo (butterfly environments)"
+  license: MIT
+  language: Python
+  stars: ~3400
+
+  agents:
+    knights:
+      count: 2
+      role: "Melee fighters, attack zombies at close range"
+    archers:
+      count: 2
+      role: "Ranged fighters, shoot arrows at zombies"
+    total: 4
+
+  mechanics:
+    waves: "Zombies walk down the screen in waves of increasing difficulty"
+    cooperation: "Agents must work together — knights tank, archers deal ranged damage"
+    death: "Agents can die from zombie contact. Dead agents don't respawn."
+    win_condition: "Survive all waves"
+    lose_condition: "All agents die"
+
+  action_space:
+    type: "Discrete(6)"
+    actions:
+      0: "do nothing"
+      1: "rotate clockwise"
+      2: "rotate counter-clockwise"
+      3: "move forward"
+      4: "move backward"
+      5: "attack (sword swing for knights, arrow shot for archers)"
+
+  observation_space:
+    type: "Box (512x512x3 image) OR vectorized entity observations"
+    vectorized:
+      description: "Structured arrays of entity positions, types, health"
+      fields:
+        - agent_pos: "[x, y]"
+        - agent_health: "int"
+        - agent_type: "knight or archer"
+        - nearby_zombies: "[{pos, health, distance}]"
+        - nearby_allies: "[{id, pos, health, type}]"
+        - arrows_in_flight: "[{pos, velocity}]"
+
+  headless_feasibility:
+    native: "render_mode=None runs headless out of the box"
+    api: "PettingZoo Parallel API — observation, action_space, reward per agent per step"
+    install: "pip install pettingzoo[butterfly]"
+    example: |
+      from pettingzoo.butterfly import knights_archers_zombies_v10
+      env = knights_archers_zombies_v10.parallel_env(render_mode=None)
+      observations, infos = env.reset()
+      while env.agents:
+          actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+          observations, rewards, terminations, truncations, infos = env.step(actions)
+
+  miner_contract:
+    role: "Control one or more agents (knights/archers) cooperating against zombies"
+    input: "Observation dict per agent (structured entity data)"
+    output: "Action int (0-5) per agent"
+    latency_sla: "150ms per step"
+    cooperative_signal: "Miner AI quality directly correlates with team survival"
+
+  scoring:
+    primary: "Waves survived (40%)"
+    secondary: "Enemies killed (25%)"
+    tertiary: "Allies alive at end (25%) — cooperative survival signal"
+    tiebreaker: "Total team survival time (10%)"
+    normalization: "rank-based across all miners"
+
+  frontend:
+    challenge: "Upstream is Pygame — no browser version exists"
+    approach: >
+      Build a JS/Canvas renderer. Validator runs PettingZoo env headless,
+      streams game state to browser via SSE/WebSocket. Browser renders
+      the top-down game with knights, archers, zombies, arrows.
+      Player input goes back over WebSocket to control one agent,
+      miner AI controls the rest cooperatively.
+    aesthetic: "Match PwnTensor dark retro style"

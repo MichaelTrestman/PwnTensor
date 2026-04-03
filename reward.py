@@ -32,36 +32,59 @@ def score_pactensor(episode_log: dict) -> float:
     return (danger + efficiency + survival) / 100.0
 
 
-def score_mortal_kombat(episode_log: dict) -> float:
+def score_meleelight(episode_log: dict) -> float:
     """
-    Fighting game scoring. Miner controls p2 against a reference opponent (p1).
-    Score = normalized damage dealt minus damage taken.
+    Platform fighter scoring (Melee Light). Miner controls one fighter
+    vs a reference opponent.
+    Score = stocks remaining + damage dealt - damage taken, normalized.
     """
-    MAX_HEALTH = episode_log.get("max_health", 100)
-    dmg_dealt = sum(episode_log.get("p2_damage_events", []))
-    dmg_taken = sum(episode_log.get("p1_damage_events", []))
-    raw = (dmg_dealt - dmg_taken) / MAX_HEALTH  # -1 to +1
-    return max(0.0, (raw + 1.0) / 2.0)  # normalize to 0-1
+    max_stocks = episode_log.get("max_stocks", 3)
+    stocks_remaining = episode_log.get("stocks_remaining", 0)
+    damage_dealt = episode_log.get("damage_dealt", 0)
+    damage_taken = episode_log.get("damage_taken", 0)
+    opponent_stocks = episode_log.get("opponent_stocks_remaining", 0)
+
+    # Stock differential is the primary signal
+    stock_score = (stocks_remaining - opponent_stocks + max_stocks) / (2 * max_stocks)
+    # Damage differential as secondary signal, normalized by reasonable range
+    damage_score = min(1.0, max(0.0, (damage_dealt - damage_taken + 300) / 600))
+
+    # Weight: 70% stock outcome, 30% damage efficiency
+    return stock_score * 0.7 + damage_score * 0.3
 
 
-def score_halo(episode_log: dict) -> float:
+def score_kaz(episode_log: dict) -> float:
     """
-    Arena combat scoring. Miner controls the agent.
-    Score = kills - deaths + time-alive bonus.
+    Co-op survival scoring (Knights Archers Zombies). Miner controls
+    one or more agents cooperating against zombie waves.
+    Score = waves survived + enemies killed + team survival time.
     """
-    kills = episode_log.get("kills", 0)
-    deaths = episode_log.get("deaths", 0)
-    survival_ticks = episode_log.get("ticks_alive", 0)
-    raw = kills * 1.0 - deaths * 0.8 + survival_ticks * 0.002
-    # Normalize: assume reasonable range of 0-10
-    return max(0.0, min(1.0, raw / 10.0))
+    waves_survived = episode_log.get("waves_survived", 0)
+    max_waves = episode_log.get("max_waves", 10)
+    enemies_killed = episode_log.get("enemies_killed", 0)
+    max_enemies = episode_log.get("max_enemies", 50)
+    team_survival_ticks = episode_log.get("team_survival_ticks", 0)
+    max_ticks = episode_log.get("max_ticks", 3600)
+    allies_alive = episode_log.get("allies_alive_at_end", 0)
+    total_allies = episode_log.get("total_allies", 4)
+
+    # Wave progress is the primary signal
+    wave_score = waves_survived / max(max_waves, 1)
+    # Kill efficiency
+    kill_score = min(1.0, enemies_killed / max(max_enemies, 1))
+    # Team survival (cooperative signal — keeping allies alive matters)
+    survival_score = allies_alive / max(total_allies, 1)
+    # Time alive as tiebreaker
+    time_score = min(1.0, team_survival_ticks / max(max_ticks, 1))
+
+    return wave_score * 0.4 + kill_score * 0.25 + survival_score * 0.25 + time_score * 0.1
 
 
 # Game ID -> scoring function registry
 GAME_SCORERS = {
     "pactensor": score_pactensor,
-    "mortal_kombat": score_mortal_kombat,
-    "halo": score_halo,
+    "meleelight": score_meleelight,
+    "kaz": score_kaz,
 }
 
 

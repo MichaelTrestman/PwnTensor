@@ -6,15 +6,19 @@ You are working in this repository.
 # PwnTensor = Game AI Marketplace on Bittensor
 # - Game studios bring games. Each game = one Bittensor incentive mechanism.
 # - Miners compete to build the best AI agents for each game.
-# - Validators run headless sims, score miners per mechanism, serve frontend.
+# - Validators run headless sims, score miners per mechanism, serve playable frontends.
 # - protocol.py: GameStateSynapse — universal across all games (game_id routes logic)
 # - reward.py: per-game scoring functions + rank normalization
 # - game_registry.py: active games and their mechanism mappings
-# - frontend/index.html: PacTensor (demo game, mechanism 0)
+#
+# Demo games:
+#   Mechanism 0: PacTensor (custom pac-man, ghost AI) — frontend/index.html
+#   Mechanism 1: Melee Light (Smash Bros-style fighter, MIT) — frontend/meleelight/
+#   Mechanism 2: Knights Archers Zombies (co-op survival, PettingZoo, MIT) — frontend/kaz/
 
 # Quick reference:
 # - ALWAYS load subnet.invariants.yaml first (non-negotiable rules)
 # - pwntensor.architecture.yaml for the multi-game/multi-mechanism design
 # - game_adapter.yaml for the game registration contract
-# - pactensor.*.yaml for PacTensor-specific details
+# - meleelight.game.yaml / kaz.game.yaml / pactensor.*.yaml for per-game details
 

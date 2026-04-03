@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pwntensor-nginx
+  namespace: pwntensor
+data:
+  nginx.conf: |
+    server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # PacTensor (mechanism 0)
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Melee Light (mechanism 1)
+        location /melee/ {
+            alias /usr/share/nginx/html/meleelight/;
+            try_files $uri $uri/ /meleelight/index.html;
+        }
+
+        # KAZ (mechanism 2)
+        location /kaz/ {
+            alias /usr/share/nginx/html/kaz/;
+            try_files $uri $uri/ /kaz/index.html;
+        }
+
+        # Health check
+        location /healthz {
+            return 200 'ok';
+            add_header Content-Type text/plain;
+        }
+    }

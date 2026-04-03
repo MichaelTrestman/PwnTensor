@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwntensor-validator
+  namespace: pwntensor
+spec:
+  template:
+    spec:
+      containers:
+        - name: validator
+          image: pwntensor-validator:local
+          imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          # Local: mount wallet from host via hostPath
+          volumeMounts:
+            - name: wallet
+              mountPath: /root/.bittensor/wallets
+              readOnly: true
+      volumes:
+        - name: wallet
+          hostPath:
+            path: /home/user/.bittensor/wallets
+            type: DirectoryOrCreate

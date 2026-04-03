@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwntensor-validator
+  namespace: pwntensor
+spec:
+  template:
+    spec:
+      containers:
+        - name: validator
+          # Staging: pull from GHCR
+          image: ghcr.io/your-org/pwntensor:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          # Staging: wallet from k8s Secret (created from wallet files)
+          volumeMounts:
+            - name: wallet
+              mountPath: /root/.bittensor/wallets
+              readOnly: true
+      volumes:
+        - name: wallet
+          secret:
+            secretName: pwntensor-wallet-files

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pwntensor-ingress
+  namespace: pwntensor
+  annotations:
+    # GKE managed certificate
+    networking.gke.io/managed-certificates: pwntensor-cert
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+    - host: staging.pwntensor.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pwntensor-frontend
+                port:
+                  number: 80

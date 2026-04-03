@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knights Archers Zombies &mdash; PwnTensor Co-op Arena</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --void: #04040a;
+  --surface: #0d0d22;
+  --text: #e0e0ff;
+  --accent: #44ff66;
+  --dim: #444466;
+  --score-color: #22ffaa;
+  --knight: #ff9922;
+  --archer: #22ddff;
+  --zombie: #88ff44;
+  --zombie-dark: #447722;
+  --health-bar: #ff4466;
+  --arrow: #ffee44;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: 'Press Start 2P', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none;
+  z-index: 100;
+}
+
+header { text-align: center; padding: 18px 20px 10px; }
+
+.logo {
+  font-size: clamp(12px, 2.5vw, 18px);
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-shadow: 0 0 20px #44ff6688;
+}
+
+.tagline {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 2px;
+  margin-top: 6px;
+}
+
+.game-shell {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 10px 20px 20px;
+  max-width: 1060px;
+  justify-content: center;
+}
+
+.panel-box {
+  background: var(--surface);
+  border: 1px solid #2a2a55;
+  padding: 12px;
+  position: relative;
+}
+.panel-box::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #4444aa, transparent);
+}
+
+.panel-label {
+  font-size: 6px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 180px;
+}
+
+canvas#field {
+  display: block;
+  image-rendering: pixelated;
+  border: 2px solid #2a4a2a;
+  box-shadow: 0 0 30px #44ff6622, inset 0 0 30px #00002244;
+}
+
+.canvas-wrap { position: relative; }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4,4,10,0.92);
+  z-index: 50;
+}
+.overlay.hidden { display: none; }
+
+.overlay-title {
+  font-size: clamp(10px, 2.5vw, 16px);
+  color: var(--accent);
+  text-shadow: 0 0 20px #44ff6699;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.overlay-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 24px;
+  text-align: center;
+  line-height: 1.8;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 10px 20px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.btn:hover { color: var(--void); }
+.btn:hover::before { opacity: 1; }
+.btn span { position: relative; z-index: 1; }
+
+.agent-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.agent-swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+.agent-name { color: var(--text); flex: 1; }
+.agent-hp { font-size: 8px; color: var(--health-bar); }
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+.metric-key { color: var(--dim); }
+.metric-val { color: var(--text); }
+
+.ai-source {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #7777aa;
+}
+.ai-source .highlight { color: var(--score-color); }
+
+.controls-list {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: var(--dim);
+  line-height: 2;
+}
+.controls-list .key {
+  display: inline-block;
+  background: #1a1a33;
+  border: 1px solid #333355;
+  padding: 0 4px;
+  color: var(--text);
+  margin-right: 4px;
+}
+
+.subnet-status {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  line-height: 1.8;
+}
+.status-row { display: flex; justify-content: space-between; }
+.status-key { color: var(--dim); }
+.status-live { color: #22ffaa; }
+.status-val { color: var(--text); }
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+footer {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: var(--dim);
+  text-align: center;
+  padding: 10px 20px 20px;
+  letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">KNIGHTS <span style="color:#22ddff">ARCHERS</span> <span style="color:#ff4466">ZOMBIES</span></div>
+  <div class="tagline">co-op survival ai &middot; powered by bittensor subnet &middot; mechanism 2</div>
+</header>
+
+<div class="game-shell">
+
+  <!-- LEFT PANEL -->
+  <div class="side-panel">
+    <div class="panel-box">
+      <div class="panel-label">Your Team</div>
+      <div id="team-roster">
+        <div class="agent-entry">
+          <div class="agent-swatch" style="background:var(--knight)"></div>
+          <span class="agent-name">KNIGHT 0 (You)</span>
+          <span class="agent-hp" id="hp-k0">100</span>
+        </div>
+        <div class="agent-entry">
+          <div class="agent-swatch" style="background:var(--knight)"></div>
+          <span class="agent-name">KNIGHT 1 (AI)</span>
+          <span class="agent-hp" id="hp-k1">100</span>
+        </div>
+        <div class="agent-entry">
+          <div class="agent-swatch" style="background:var(--archer)"></div>
+          <span class="agent-name">ARCHER 0 (AI)</span>
+          <span class="agent-hp" id="hp-a0">100</span>
+        </div>
+        <div class="agent-entry">
+          <div class="agent-swatch" style="background:var(--archer)"></div>
+          <span class="agent-name">ARCHER 1 (AI)</span>
+          <span class="agent-hp" id="hp-a1">100</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">AI Source</div>
+      <div class="ai-source">
+        Miner: <span class="highlight" id="kaz-miner-id">baseline-v0</span><br>
+        Algo: <span class="highlight">random policy</span><br>
+        Score: <span class="highlight" id="kaz-miner-score">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap">
+    <canvas id="field" width="600" height="500"></canvas>
+
+    <div class="overlay" id="overlay-start">
+      <div class="overlay-title">KNIGHTS <span style="color:#22ddff">ARCHERS</span> <span style="color:#ff4466">ZOMBIES</span></div>
+      <div class="overlay-sub">
+        Survive the zombie waves with your AI teammates.<br>
+        You control Knight 0. Miner AI controls the rest.<br>
+        Better miner AI = better teammates = longer survival.<br><br>
+        <span style="color:#44ff66">WASD to move &middot; SPACE to attack</span>
+      </div>
+      <button class="btn" onclick="startWave()"><span>DEPLOY</span></button>
+    </div>
+
+    <div class="overlay hidden" id="overlay-wave">
+      <div class="overlay-title" id="wave-title">WAVE CLEARED</div>
+      <div class="overlay-sub" id="wave-sub"></div>
+      <button class="btn" onclick="nextWave()"><span>NEXT WAVE</span></button>
+    </div>
+
+    <div class="overlay hidden" id="overlay-gameover">
+      <div class="overlay-title" style="color:#ff4466">OVERRUN</div>
+      <div class="overlay-sub" id="kaz-gameover-sub"></div>
+      <button class="btn" onclick="resetGame()"><span>TRY AGAIN</span></button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="side-panel">
+    <div class="panel-box">
+      <div class="panel-label">Subnet Live</div>
+      <div class="subnet-status">
+        <div class="status-row">
+          <span class="status-key">miners</span>
+          <span class="status-live">&bull;<span class="blink"> </span>192</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">validators</span>
+          <span class="status-val">47</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">mechanism</span>
+          <span class="status-val">2</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Battle Stats</div>
+      <div id="battle-stats">
+        <div class="metric-row"><span class="metric-key">wave</span><span class="metric-val" id="m-wave">1</span></div>
+        <div class="metric-row"><span class="metric-key">kills</span><span class="metric-val" id="m-kills">0</span></div>
+        <div class="metric-row"><span class="metric-key">alive</span><span class="metric-val" id="m-alive">4/4</span></div>
+        <div class="metric-row"><span class="metric-key">zombies</span><span class="metric-val" id="m-zombies">0</span></div>
+        <div class="metric-row"><span class="metric-key">time</span><span class="metric-val" id="m-kaz-time">0s</span></div>
+      </div>
+    </div>
+    <div class="panel-box">
+      <div class="panel-label">Controls</div>
+      <div class="controls-list">
+        <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> move<br>
+        <span class="key">SPACE</span> attack<br>
+        <span class="key">Q</span><span class="key">E</span> rotate
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  KAZ v0.1 &middot; PWNTENSOR SUBNET &middot; MECHANISM 2 &middot; SOURCE: FARAMA PETTINGZOO (MIT)
+</footer>
+
+<script>
+// ============================================================
+// KNIGHTS ARCHERS ZOMBIES — Simplified Co-op Engine
+// Full PettingZoo integration TODO: validator runs headless
+// pettingzoo.butterfly.knights_archers_zombies_v10 and streams
+// state to this frontend via SSE/WebSocket.
+//
+// This is a minimal standalone demo of the co-op concept
+// with the PwnTensor UI shell.
+// ============================================================
+
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+let running = false;
+let gameStart = 0;
+let wave = 1;
+let kills = 0;
+
+const AGENT_SIZE = 12;
+const ZOMBIE_SIZE = 10;
+const ARROW_SPEED = 6;
+
+function makeAgent(id, type, x, y, color) {
+  return { id, type, x, y, angle: -Math.PI/2, hp: 100, maxHp: 100, color, alive: true, attackCooldown: 0, speed: type === 'knight' ? 2.0 : 1.5 };
+}
+
+let agents = [];
+let zombies = [];
+let arrows = [];
+
+function initGame() {
+  agents = [
+    makeAgent('knight_0', 'knight', W*0.3, H*0.8, '#ff9922'),
+    makeAgent('knight_1', 'knight', W*0.5, H*0.8, '#ffbb44'),
+    makeAgent('archer_0', 'archer', W*0.4, H*0.9, '#22ddff'),
+    makeAgent('archer_1', 'archer', W*0.6, H*0.9, '#44eeff'),
+  ];
+  zombies = [];
+  arrows = [];
+  wave = 1;
+  kills = 0;
+  spawnWave(wave);
+}
+
+function spawnWave(w) {
+  const count = 3 + w * 2;
+  for (let i = 0; i < count; i++) {
+    zombies.push({
+      x: 40 + Math.random() * (W - 80),
+      y: -20 - Math.random() * 100,
+      hp: 20 + w * 5,
+      maxHp: 20 + w * 5,
+      speed: 0.3 + w * 0.05 + Math.random() * 0.2,
+      size: ZOMBIE_SIZE,
+    });
+  }
+}
+
+// Input
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; e.key === ' ' && e.preventDefault(); });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function playerControl(agent) {
+  if (!agent.alive) return;
+  let dx = 0, dy = 0;
+  if (keys['w']) dy = -1;
+  if (keys['s']) dy = 1;
+  if (keys['a']) dx = -1;
+  if (keys['d']) dx = 1;
+  if (dx || dy) {
+    const len = Math.sqrt(dx*dx + dy*dy);
+    agent.x += (dx/len) * agent.speed;
+    agent.y += (dy/len) * agent.speed;
+    agent.angle = Math.atan2(dy, dx);
+  }
+  if (keys['q']) agent.angle -= 0.08;
+  if (keys['e']) agent.angle += 0.08;
+
+  if (keys[' '] && agent.attackCooldown <= 0) {
+    attack(agent);
+    agent.attackCooldown = agent.type === 'knight' ? 15 : 25;
+  }
+
+  agent.x = Math.max(AGENT_SIZE, Math.min(W - AGENT_SIZE, agent.x));
+  agent.y = Math.max(AGENT_SIZE, Math.min(H - AGENT_SIZE, agent.y));
+}
+
+function aiControl(agent) {
+  if (!agent.alive) return;
+  // Simple AI: find nearest zombie, face it, attack
+  let nearest = null, nearDist = Infinity;
+  for (const z of zombies) {
+    const d = Math.hypot(z.x - agent.x, z.y - agent.y);
+    if (d < nearDist) { nearest = z; nearDist = d; }
+  }
+  if (!nearest) return;
+
+  agent.angle = Math.atan2(nearest.y - agent.y, nearest.x - agent.x);
+
+  if (agent.type === 'knight') {
+    // Approach zombie
+    if (nearDist > 25) {
+      agent.x += Math.cos(agent.angle) * agent.speed;
+      agent.y += Math.sin(agent.angle) * agent.speed;
+    }
+    if (nearDist < 30 && agent.attackCooldown <= 0) {
+      attack(agent);
+      agent.attackCooldown = 15;
+    }
+  } else {
+    // Archer: keep distance, shoot
+    if (nearDist < 80) {
+      agent.x -= Math.cos(agent.angle) * agent.speed * 0.5;
+      agent.y -= Math.sin(agent.angle) * agent.speed * 0.5;
+    }
+    if (agent.attackCooldown <= 0) {
+      attack(agent);
+      agent.attackCooldown = 30;
+    }
+  }
+
+  agent.x = Math.max(AGENT_SIZE, Math.min(W - AGENT_SIZE, agent.x));
+  agent.y = Math.max(AGENT_SIZE, Math.min(H - AGENT_SIZE, agent.y));
+}
+
+function attack(agent) {
+  if (agent.type === 'knight') {
+    // Melee: damage nearby zombies
+    for (const z of zombies) {
+      const d = Math.hypot(z.x - agent.x, z.y - agent.y);
+      if (d < 30) {
+        z.hp -= 25;
+      }
+    }
+  } else {
+    // Archer: shoot arrow
+    arrows.push({
+      x: agent.x, y: agent.y,
+      vx: Math.cos(agent.angle) * ARROW_SPEED,
+      vy: Math.sin(agent.angle) * ARROW_SPEED,
+      life: 80,
+    });
+  }
+}
+
+function updateZombies() {
+  for (const z of zombies) {
+    // Move toward nearest alive agent
+    let nearest = null, nearDist = Infinity;
+    for (const a of agents) {
+      if (!a.alive) continue;
+      const d = Math.hypot(a.x - z.x, a.y - z.y);
+      if (d < nearDist) { nearest = a; nearDist = d; }
+    }
+    if (nearest) {
+      const angle = Math.atan2(nearest.y - z.y, nearest.x - z.x);
+      z.x += Math.cos(angle) * z.speed;
+      z.y += Math.sin(angle) * z.speed;
+
+      // Damage agent on contact
+      if (nearDist < AGENT_SIZE + ZOMBIE_SIZE) {
+        nearest.hp -= 0.5;
+        if (nearest.hp <= 0) { nearest.alive = false; nearest.hp = 0; }
+      }
+    } else {
+      z.y += z.speed; // walk down if no agents
+    }
+  }
+}
+
+function updateArrows() {
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const a = arrows[i];
+    a.x += a.vx;
+    a.y += a.vy;
+    a.life--;
+
+    if (a.life <= 0 || a.x < 0 || a.x > W || a.y < 0 || a.y > H) {
+      arrows.splice(i, 1);
+      continue;
+    }
+
+    // Hit zombie
+    for (const z of zombies) {
+      if (Math.hypot(z.x - a.x, z.y - a.y) < ZOMBIE_SIZE + 3) {
+        z.hp -= 15;
+        arrows.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+function cleanDead() {
+  const before = zombies.length;
+  zombies = zombies.filter(z => z.hp > 0);
+  kills += before - zombies.length;
+}
+
+function update() {
+  playerControl(agents[0]);
+  for (let i = 1; i < agents.length; i++) aiControl(agents[i]);
+
+  for (const a of agents) {
+    if (a.attackCooldown > 0) a.attackCooldown--;
+  }
+
+  updateZombies();
+  updateArrows();
+  cleanDead();
+
+  // Check wave clear
+  if (zombies.length === 0) {
+    running = false;
+    document.getElementById('wave-title').textContent = 'WAVE ' + wave + ' CLEARED';
+    const alive = agents.filter(a => a.alive).length;
+    document.getElementById('wave-sub').textContent =
+      'Kills: ' + kills + '\nAgents alive: ' + alive + '/4';
+    document.getElementById('overlay-wave').classList.remove('hidden');
+  }
+
+  // Check game over
+  if (!agents.some(a => a.alive)) {
+    running = false;
+    const elapsed = Math.round((Date.now() - gameStart) / 1000);
+    document.getElementById('kaz-gameover-sub').textContent =
+      'Wave: ' + wave + '\nKills: ' + kills + '\nSurvived: ' + elapsed + 's';
+    document.getElementById('overlay-gameover').classList.remove('hidden');
+  }
+
+  updateKazHUD();
+}
+
+function draw() {
+  // Dark grass background
+  ctx.fillStyle = '#080816';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines for depth
+  ctx.strokeStyle = '#0d0d22';
+  ctx.lineWidth = 1;
+  for (let y = 0; y < H; y += 30) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Arrows
+  ctx.strokeStyle = '#ffee44';
+  ctx.lineWidth = 2;
+  for (const a of arrows) {
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(a.x - a.vx * 2, a.y - a.vy * 2);
+    ctx.stroke();
+  }
+
+  // Zombies
+  for (const z of zombies) {
+    ctx.shadowColor = '#88ff44';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#447722';
+    ctx.beginPath();
+    ctx.arc(z.x, z.y, z.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // HP bar
+    const hpW = z.size * 2;
+    const hpFrac = z.hp / z.maxHp;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(z.x - hpW/2, z.y - z.size - 6, hpW, 3);
+    ctx.fillStyle = '#ff4466';
+    ctx.fillRect(z.x - hpW/2, z.y - z.size - 6, hpW * hpFrac, 3);
+  }
+
+  // Agents
+  for (const a of agents) {
+    if (!a.alive) continue;
+    ctx.shadowColor = a.color;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = a.color;
+
+    if (a.type === 'knight') {
+      // Square for knights
+      ctx.fillRect(a.x - AGENT_SIZE/2, a.y - AGENT_SIZE/2, AGENT_SIZE, AGENT_SIZE);
+    } else {
+      // Triangle for archers
+      ctx.beginPath();
+      ctx.moveTo(a.x + Math.cos(a.angle) * AGENT_SIZE, a.y + Math.sin(a.angle) * AGENT_SIZE);
+      ctx.lineTo(a.x + Math.cos(a.angle + 2.4) * AGENT_SIZE * 0.7, a.y + Math.sin(a.angle + 2.4) * AGENT_SIZE * 0.7);
+      ctx.lineTo(a.x + Math.cos(a.angle - 2.4) * AGENT_SIZE * 0.7, a.y + Math.sin(a.angle - 2.4) * AGENT_SIZE * 0.7);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    // Direction line
+    ctx.strokeStyle = '#ffffff44';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(a.x + Math.cos(a.angle) * 18, a.y + Math.sin(a.angle) * 18);
+    ctx.stroke();
+  }
+}
+
+function updateKazHUD() {
+  document.getElementById('m-wave').textContent = wave;
+  document.getElementById('m-kills').textContent = kills;
+  const alive = agents.filter(a => a.alive).length;
+  document.getElementById('m-alive').textContent = alive + '/4';
+  document.getElementById('m-zombies').textContent = zombies.length;
+  const elapsed = Math.round((Date.now() - gameStart) / 1000);
+  document.getElementById('m-kaz-time').textContent = elapsed + 's';
+
+  // Team HP
+  document.getElementById('hp-k0').textContent = Math.round(agents[0].hp);
+  document.getElementById('hp-k1').textContent = Math.round(agents[1].hp);
+  document.getElementById('hp-a0').textContent = Math.round(agents[2].hp);
+  document.getElementById('hp-a1').textContent = Math.round(agents[3].hp);
+}
+
+function startWave() {
+  document.getElementById('overlay-start').classList.add('hidden');
+  initGame();
+  gameStart = Date.now();
+  running = true;
+}
+
+function nextWave() {
+  document.getElementById('overlay-wave').classList.add('hidden');
+  wave++;
+  spawnWave(wave);
+  running = true;
+}
+
+function resetGame() {
+  document.getElementById('overlay-gameover').classList.add('hidden');
+  initGame();
+  gameStart = Date.now();
+  running = true;
+}
+
+function gameLoop() {
+  requestAnimationFrame(gameLoop);
+  if (!running) return;
+  update();
+  draw();
+}
+
+initGame();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

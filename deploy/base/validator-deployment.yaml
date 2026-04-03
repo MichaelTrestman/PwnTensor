@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwntensor-validator
+  namespace: pwntensor
+  labels:
+    app: pwntensor
+    component: validator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pwntensor
+      component: validator
+  template:
+    metadata:
+      labels:
+        app: pwntensor
+        component: validator
+    spec:
+      containers:
+        # Validator — runs headless game sims, scores miners, sets weights
+        - name: validator
+          image: pwntensor-validator:latest
+          envFrom:
+            - configMapRef:
+                name: pwntensor-config
+          env:
+            - name: WALLET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pwntensor-wallet
+                  key: wallet-name
+            - name: HOTKEY_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pwntensor-wallet
+                  key: hotkey-name
+          volumeMounts:
+            - name: wallet
+              mountPath: /root/.bittensor/wallets
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import bittensor; print('ok')"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+
+        # Frontend — nginx serving all three game UIs
+        - name: frontend
+          image: nginx:alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: frontend-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+            - name: frontend-files
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+      volumes:
+        - name: wallet
+          secret:
+            secretName: pwntensor-wallet-files
+            optional: true
+        - name: frontend-config
+          configMap:
+            name: pwntensor-nginx
+        - name: frontend-files
+          configMap:
+            name: pwntensor-frontend
